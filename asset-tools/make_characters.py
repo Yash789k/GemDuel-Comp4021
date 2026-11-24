@@ -11,7 +11,6 @@ import math, os, sys
 from PIL import Image
 
 W, H = 24, 25
-OUT = sys.argv[1]
 SCALE_PREVIEW = 6
 
 
@@ -435,29 +434,6 @@ def sheet(fn, pal):
     return im
 
 
-os.makedirs(OUT, exist_ok=True)
-preview_rows = []
-for name, (fn, main, alt) in SPECIES.items():
-    for tag, pal in (('', main), ('-alt', alt)):
-        sh = sheet(fn, pal)
-        sh.save(os.path.join(OUT, f'char-{name}{tag}.png'))
-        preview_rows.append(sh)
-if len(sys.argv) > 2:
-    # preview: idle down/left/up/right frame 0 + 4 walk frames down, for each sheet
-    cols = []
-    for sh in preview_rows:
-        strip = Image.new('RGBA', (W * 8, H), (60, 120, 60, 255))
-        for k, (cx, ry) in enumerate([(0, 0), (0, 1), (0, 2), (0, 3), (1, 4), (3, 4), (6, 4), (2, 5)]):
-            fr = sh.crop((cx * W, ry * H, cx * W + W, ry * H + H))
-            strip.alpha_composite(fr, (k * W, 0))
-        cols.append(strip)
-    big = Image.new('RGBA', (W * 8 * 2 + 8, H * (len(cols) // 2)), (40, 40, 40, 255))
-    for i, s in enumerate(cols):
-        big.alpha_composite(s, ((i % 2) * (W * 8 + 8), (i // 2) * H))
-    big.resize((big.width * SCALE_PREVIEW, big.height * SCALE_PREVIEW), Image.NEAREST).save(sys.argv[2])
-print('characters ok')
-
-
 # ---------------------------------------------------------------- avatars
 # Avatar icons are drawn from the same pixels as the idle-down frame,
 # so the avatar a player picks is exactly the character they play.
@@ -480,8 +456,38 @@ def avatar_svg(fn, pal):
             '<rect width="64" height="64" rx="12" fill="#192c39"/>' + ''.join(parts) + '</svg>')
 
 
-if len(sys.argv) > 3:
+def main():
+    if len(sys.argv) < 2:
+        raise SystemExit('Usage: make_characters.py SHEET_DIR [PREVIEW_PNG [AVATAR_DIR]]')
+    output_dir = sys.argv[1]
+    os.makedirs(output_dir, exist_ok=True)
+    preview_rows = []
     for name, (fn, main, alt) in SPECIES.items():
-        with open(os.path.join(sys.argv[3], f'avatar-{name}.svg'), 'w') as fh:
-            fh.write(avatar_svg(fn, main))
-    print('avatars ok')
+        for tag, pal in (('', main), ('-alt', alt)):
+            sh = sheet(fn, pal)
+            sh.save(os.path.join(output_dir, f'char-{name}{tag}.png'))
+            preview_rows.append(sh)
+    if len(sys.argv) > 2:
+        # preview: idle down/left/up/right frame 0 + 4 walk frames down, for each sheet
+        cols = []
+        for sh in preview_rows:
+            strip = Image.new('RGBA', (W * 8, H), (60, 120, 60, 255))
+            for k, (cx, ry) in enumerate([(0, 0), (0, 1), (0, 2), (0, 3), (1, 4), (3, 4), (6, 4), (2, 5)]):
+                fr = sh.crop((cx * W, ry * H, cx * W + W, ry * H + H))
+                strip.alpha_composite(fr, (k * W, 0))
+            cols.append(strip)
+        big = Image.new('RGBA', (W * 8 * 2 + 8, H * (len(cols) // 2)), (40, 40, 40, 255))
+        for i, s in enumerate(cols):
+            big.alpha_composite(s, ((i % 2) * (W * 8 + 8), (i // 2) * H))
+        big.resize((big.width * SCALE_PREVIEW, big.height * SCALE_PREVIEW), Image.NEAREST).save(sys.argv[2])
+    print('characters ok')
+
+    if len(sys.argv) > 3:
+        for name, (fn, main, alt) in SPECIES.items():
+            with open(os.path.join(sys.argv[3], f'avatar-{name}.svg'), 'w') as fh:
+                fh.write(avatar_svg(fn, main))
+        print('avatars ok')
+
+
+if __name__ == '__main__':
+    main()

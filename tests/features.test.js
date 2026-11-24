@@ -60,8 +60,9 @@ test('statistics track points lost to fire, streaks, freezes landed and distance
   assert.ok(Math.abs(b.stats.distance - 18) < 1e-9);
 });
 
-test('leaderboard counts games and reports all-time ranks', async () => {
+test('leaderboard counts games and reports all-time ranks', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemrush-rank-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const storage = await openStorage(dir);
   const players = [{ username: 'alpha', name: 'A', avatar: 'fox', score: 30 }, { username: 'beta', name: 'B', avatar: 'frog', score: 45 }];
   await storage.record({ matchId: 'm1', winner: 'beta', players });
@@ -86,7 +87,6 @@ test('legacy animals, Green Ranger and Ember Courier all have selectable sheets 
   }
   assert.equal(validateRegistration({ ...base, avatar: 'dragon' }), 'Choose an approved avatar.');
 });
-
 
 test('legacy accounts and ranking rows without an avatar resolve to Green Ranger', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemrush-legacy-'));

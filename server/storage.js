@@ -52,7 +52,12 @@ async function openStorage(directory) {
     .map(r => ({ ...r, avatar: Characters.idFor(r.avatar), games: r.games || 0 }));
   const top = () => sorted().slice(0, 10);
   // All-time position (1-based) of every listed player, for the results page.
-  const ranks = usernames => Object.fromEntries(usernames.map(u => [u, sorted().findIndex(r => r.username === u) + 1]));
+  const ranks = usernames => {
+    const records = sorted();
+    return Object.fromEntries(usernames.map(username => [
+      username, records.findIndex(record => record.username === username) + 1
+    ]));
+  };
   return {
     accounts, rankings, publicUser, top, ranks,
     total: () => rankings.value.records.length,

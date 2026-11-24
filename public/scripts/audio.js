@@ -10,9 +10,12 @@ const GameAudio = (() => {
     if (muted || !unlocked) return;
     const sound = sounds[name];
     if (!sound) return;
-    if (name !== 'background') sound.volume = volume;
-    if (name !== 'background') sound.currentTime = 0;
-    if (name === 'background' && !sound.paused) return;
+    if (name === 'background') {
+      if (!sound.paused) return;
+    } else {
+      sound.volume = volume;
+      sound.currentTime = 0;
+    }
     sound.play().catch(() => {}); // Autoplay/audio failure never blocks the match.
   };
   const stop = () => { Object.values(sounds).forEach(s => { s.pause(); s.currentTime = 0; }); };

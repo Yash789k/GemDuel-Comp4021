@@ -151,7 +151,7 @@ class Matchmaking {
       }
     }
     this.detach(username, game);
-    this.connections.get(username)?.emit('lobby:return', { message: game.phase === 'finished' && reason !== 'home' ? 'Returned to the lobby.' : '' });
+    this.connections.get(username)?.emit('lobby:return', { message: game.phase === 'finished' ? 'Returned to the lobby.' : '' });
   }
   signout(sessionId) {
     for (const [username, game] of this.membership) {
