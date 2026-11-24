@@ -99,12 +99,17 @@ def pickups():
     d.line((12,1,14,3),fill='#ffb5a0');d.point((7,7),fill='#ffefaa')
     im.save(ASSETS/'laser.png')
 
-    im=Image.new('RGBA',(16,8));d=ImageDraw.Draw(im)
-    d.polygon([(0,3),(5,3),(3,1),(9,2),(10,0),(15,3),(15,4),(11,7),
-               (10,6),(4,6),(6,4),(0,4)], fill=INK)
-    d.polygon([(3,3),(7,3),(5,2),(10,3),(11,1),(14,3),(14,4),(11,6),
-               (9,5),(6,5),(8,4)],fill='#fa4e68')
-    d.line((8,3,12,3,13,4),fill='#fff0a5');im.save(ASSETS/'laser-bolt.png')
+    # Side-facing plasma round: dark casing, luminous nose and a tapered exhaust.
+    bolt = Image.new('RGBA', (20, 10))
+    pen = ImageDraw.Draw(bolt)
+    pen.polygon([(0,4),(5,3),(3,1),(8,2),(10,1),(15,1),(19,4),
+                 (19,5),(15,8),(9,8),(6,7),(2,8),(4,5),(0,5)], fill=INK)
+    pen.polygon([(2,4),(7,4),(5,2),(10,3),(10,6),(5,7),(7,5),(2,5)], fill='#ff5f99')
+    pen.polygon([(9,3),(12,2),(15,2),(18,4),(18,5),(15,7),(11,7),(9,6)], fill='#ff4086')
+    pen.rectangle((11,3,15,5), fill='#fff2ec')
+    pen.line((15,3,17,4), fill='#ffffff')
+    pen.line((9,6,14,6), fill='#ffaecd')
+    bolt.save(ASSETS/'laser-bolt.png')
 
 def main():
     sheet=Image.new('RGBA',(240,200))

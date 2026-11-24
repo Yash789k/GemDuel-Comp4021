@@ -8,7 +8,7 @@ module.exports = Object.freeze({
   gemLifetime: 6000, gemInterval: 650, maxGems: 12, initialGems: 8,
   powerInterval: 8000, powerLifetime: 10000, maxPowers: 2,
   bootsDuration: 5000, freezeDuration: 2000, stunDuration: 1000,
-  growthDuration: 5000, laserLifetime: 1800, laserSpeed: 360,
+  growthDuration: 5000, laserLifetime: 3000,
   laserLockDuration: 1000, laserVisionDuration: 2000,
   fireCooldown: 1500, fireCount: 3,
   // Rising tension: one extra fire joins when 60 s and 30 s remain, and the

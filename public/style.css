@@ -64,3 +64,8 @@ img[src*="/assets/avatar-"]{image-rendering:pixelated}
 #shoot-button { font-size: .85rem; padding: .4rem .7rem; }
 #shoot-button:disabled { cursor: default; }
 .score-player .effects { height: auto; min-height: 23px; white-space: normal; }
+
+.laser-control { display: grid; gap: 3px; justify-items: center; }
+.laser-control img { width: 20px; height: 20px; image-rendering: pixelated; vertical-align: middle; }
+#shoot-button:enabled { background: #ffb8d4; border-color: #ffceeb; color: #2c1830; }
+#laser-hint { color: var(--text); font-size: .8rem; text-align: center; }

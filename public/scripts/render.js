@@ -152,15 +152,6 @@ const ArenaRenderer = function(canvas) {
       ctx.globalAlpha = 1;
     }
 
-    for (const bolt of latest.projectiles) {
-      const point = interpolated(bolt, 'projectiles', now);
-      ctx.save();
-      ctx.translate(Math.round(point.x), Math.round(point.y));
-      ctx.rotate(bolt.angle);
-      ctx.drawImage(images.get('laser-bolt.png'), -16, -8, 32, 16);
-      ctx.restore();
-    }
-
     // Players: work out where each name tag goes first so they never overlap.
     const views = latest.players.map((player, index) => ({ player, index, p: interpolated(player, 'players', now) }));
     ctx.font = 'bold 12px Arial';
@@ -204,6 +195,37 @@ const ArenaRenderer = function(canvas) {
       ctx.restore();
     });
     for (const key of sprites.keys()) if (!active.has(key)) sprites.delete(key);
+
+    // Draw over the characters so the first frames are visible at the shooter's hand.
+    for (const bolt of latest.projectiles) {
+      const point = interpolated(bolt, 'projectiles', now);
+      const renderAt = now - 80;
+      ctx.save();
+      ctx.beginPath();
+      let hasTrail = false;
+      for (const frame of history) {
+        if (frame.serverTime > renderAt || renderAt - frame.serverTime > 200) continue;
+        const past = frame.projectiles.find(projectile => projectile.id === bolt.id);
+        if (!past) continue;
+        if (hasTrail) ctx.lineTo(past.x, past.y - 8);
+        else ctx.moveTo(past.x, past.y - 8);
+        hasTrail = true;
+      }
+      if (hasTrail) {
+        ctx.lineTo(point.x, point.y - 8);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#672046';
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.strokeStyle = '#ff8ab9';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      ctx.translate(Math.round(point.x), Math.round(point.y - 8));
+      ctx.rotate(bolt.angle);
+      ctx.drawImage(images.get('laser-bolt.png'), -20, -10, 40, 20);
+      ctx.restore();
+    }
 
     // Particles
     particles = particles.filter(q => (q.life -= dt) > 0);
@@ -295,6 +317,13 @@ const ArenaRenderer = function(canvas) {
       const colour = fruit ? '#ff9d79' : '#74f7eb';
       burst(e.x, e.y, colour, 14);
       bursts.push({ time: e.time, x: e.x, y: e.y, label: fruit ? 'DOUBLE REACH!' : '+1 LASER', colour });
+      if (!fruit && mine) {
+        banners = banners.filter(b => b.kind !== 'laser-ready');
+        banners.push({ kind: 'laser-ready', text: 'Laser ready · Press F to fire', colour: '#ffb7d4', start: performance.now(), ms: 2200 });
+      }
+    } else if (e.type === 'laser-fired') {
+      if (mine) banners = banners.filter(b => b.kind !== 'laser-ready');
+      burst(e.x + 12 * Math.cos(e.angle), e.y - 8 + 12 * Math.sin(e.angle), '#ffedf8', 12, 95, 3);
     } else if (e.type === 'laser-hit') {
       burst(e.x, e.y, '#74f7eb', 20);
     } else if (e.type === 'wave') {

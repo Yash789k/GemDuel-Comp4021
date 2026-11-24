@@ -58,6 +58,7 @@ async function verifyPowerups(a, b, game, until) {
   await until(() => shooter.laserShots === 1 && shooter.growthUntil > initialEnd);
   await a.mouse.up();
 
+  await until(async () => (await a.locator('#laser-hint').textContent()).includes('Press F or click'));
   // The target changes position while the shot is in flight.
   await b.keyboard.down('w');
   await a.locator('#shoot-button').click();
@@ -66,6 +67,9 @@ async function verifyPowerups(a, b, game, until) {
   await until(() => game.projectiles.length && Math.abs(heading - game.projectiles[0].angle) > .015);
   await b.keyboard.up('w');
   for (const page of [a, b]) await until(async () => !!await drawn(page, 'laser-bolt.png'));
+  await until(async () => (await a.locator('#laser-hint').textContent()).includes('Bullet tracking'));
+  await a.waitForTimeout(550);
+  await a.locator('#game-view').screenshot({ path: require('node:path').join(__dirname, '../test-output/laser-in-flight.png') });
   await b.locator('#vision-mask').waitFor({state:'visible'});
   assert.equal(await a.locator('#vision-mask').isVisible(), false);
   assert.equal(shooter.laserShots, 0);

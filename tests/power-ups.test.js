@@ -76,13 +76,15 @@ test('homing laser follows a moving opponent and applies timed movement and sigh
   pickup(g, 'laser', 3010); g.shoot(owner.username, 3020);
   g.step(3120, .1);
   const first = g.snapshot(3120).projectiles[0];
-  assert.equal(first.angle, 0); assert.equal(first.y, owner.y);
+  assert.equal(first.angle, 0);
+  assert.equal(first.x - owner.x, defaults.speed * .1);
+  assert.equal(first.expiresAt, 3020 + 3000); assert.equal(first.y, owner.y);
   g.setInput(target.username, { x: 0, y: 1 }, 3120); g.step(3220, .1);
   assert.ok(g.projectiles[0].angle > 0);
   assert.ok(g.projectiles[0].y > first.y);
   g.setInput(target.username, { x: 0, y: 0 }, 3220);
   let t = 3220;
-  while (g.projectiles.length && t < 4820) { t += 20; g.step(t, .02); }
+  while (g.projectiles.length && t < 6020) { t += 20; g.step(t, .02); }
   assert.equal(g.projectiles.length, 0);
   assert.equal(g.events.filter(e => e.type === 'laser-hit').length, 1);
   assert.equal(target.laserLockUntil, t + 1000); assert.equal(target.visionUntil, t + 2000);

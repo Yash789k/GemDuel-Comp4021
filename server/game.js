@@ -134,6 +134,7 @@ class Game {
     const target = this.players.find(p => p !== owner);
     const angle = Math.atan2(target.y - owner.y, target.x - owner.x);
     owner.laserShots--;
+    this.event('laser-fired', owner, now, { angle });
     this.projectiles.push({
       id: `l${++this.nextId}`, owner: username, target: target.username,
       x: owner.x, y: owner.y, angle, expiresAt: now + this.config.laserLifetime
@@ -141,7 +142,7 @@ class Game {
     return true;
   }
   advanceProjectiles(now, dt) {
-    const travel = this.config.laserSpeed * dt;
+    const travel = this.config.speed * dt; // Always the ordinary walking speed, independent of boosts.
     this.projectiles = this.projectiles.filter(bolt => {
       if (now >= bolt.expiresAt) return false;
       const target = this.player(bolt.target);

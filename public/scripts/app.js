@@ -231,6 +231,11 @@ $(function() {
     const seconds = match.endAt ? Math.max(0, Math.min(120, Math.ceil((match.endAt - time) / 1000))) : 120;
     $('#game-time').text(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`).toggleClass('low', match.phase === 'playing' && seconds <= 10);
     const local = match.players.find(p => p.username === user.username);
+    const armed = local.laserShots > 0;
+    const flying = match.projectiles.some(bolt => bolt.owner === local.username);
+    const rival = match.players.find(player => player.username !== local.username);
+    $('#laser-hint').text(armed ? 'Press F or click to shoot at ' + rival.name + '.' :
+      flying ? 'Bullet tracking ' + rival.name + '…' : 'Collect a laser for one shot.');
     $('#shot-count').text(local.laserShots);
     $('#shoot-button').prop('disabled', !connected || match.phase !== 'playing' || !local.laserShots);
     $('#cheat-banner').prop('hidden', !(local?.cheat && match.phase === 'playing'));
