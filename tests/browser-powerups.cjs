@@ -91,6 +91,16 @@ async function verifyPowerups(a, b, game, until) {
   await until(() => game.projectiles.length === 0);
   assert.equal(rival.visionUntil, previousVisionEnd);
   assert.equal(await b.locator('#vision-mask').isVisible(), false);
+  game.gems.push({ id: 'rival-purple', color: 'purple', x: rival.x, y: rival.y, radius: 12, expiresAt: time + 60000 });
+  const before = rival.score;
+  await until(() => rival.score === before + 5);
+  game.fires.push({ id: 'fire-check', x: rival.x, y: rival.y, radius: 14, vx: 40, vy: 0 });
+  await until(() => rival.score === before + 3 && rival.stunUntil > Date.now());
+  game.fires.length = 0;
+  place('ice', shooter.x, shooter.y);
+  for (const page of [a, b]) await until(async () => (await page.locator('#player-one .effects').textContent()).includes('Freeze'));
+  assert.ok(rival.freezeUntil > Date.now());
+
 }
 
 module.exports = { observeCanvas, verifyPowerups };

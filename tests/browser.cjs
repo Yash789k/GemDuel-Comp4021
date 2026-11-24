@@ -132,7 +132,7 @@ async function until(fn, timeout = 10000) {
     await a.keyboard.press('c'); await until(() => third.player('browser_alice').cheat);
     await delay(250); assert.equal(third.player('browser_alice').cheat, true);
     await verifyPowerups(a, b, third, until);
-    passed('Both clients draw chosen characters, growth, pickups and homing bolt; drag, F and button work and only the hit player loses vision');
+    passed('Both sessions show chosen sprites, growing gem reach, laser hit and expiry, victim-only vision, and ordinary gems, fire and ice');
     await b.locator('#leave-button').click(); await a.locator('#results-view').waitFor({ state: 'visible' });
     await a.locator('#rematch-button').click(); await b.locator('#home-button').click(); await b.locator('#lobby-panel').waitFor({ state: 'visible' });
     await until(() => a.locator('#rematch-button').isDisabled());
