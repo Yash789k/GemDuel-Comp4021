@@ -73,6 +73,7 @@ class Matchmaking {
       if (before === 'loading' && current.phase === 'countdown') this.io.to(current.id).emit('match:countdown', current.snapshot(this.now()));
     }));
     socket.on('match:input', data => withMatch(data, current => current.setInput(user.username, data, this.now())));
+    socket.on('match:shoot', data => withMatch(data, current => current.shoot(user.username, this.now())));
     socket.on('match:cheat', data => withMatch(data, current => {
       const now = this.now();
       if (now - (socket.data.lastCheat || 0) < 200) return;
@@ -167,6 +168,7 @@ class Matchmaking {
   cancel(game, message) {
     if (game.phase === 'cancelled' || game.phase === 'finished') return;
     game.phase = 'cancelled';
+    game.clearEffects();
     this.io.to(game.id).emit('match:cancelled', { matchId: game.id, message });
     this.dispose(game); this.presence();
   }

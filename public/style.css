@@ -22,14 +22,45 @@
 .ranking-row:first-child .ranking-score{color:var(--yellow)}
 @media(prefers-reduced-motion:reduce){#cheat-banner,#countdown,#game-time.low{animation:none}}
 
-/* ---------- characters: 8 avatars, each one is the in-game character ---------- */
-.avatars{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.avatars label{display:flex;flex-direction:column;align-items:center;gap:2px}
-.avatars label span{font-size:11px;font-weight:700;color:var(--muted);text-transform:capitalize}
-.avatars input:checked+img+span{color:var(--mint)}
-.avatars img{image-rendering:pixelated}
-.preview-player{background:url('/assets/characters/char-fox.png') 0 -200px/480px 400px;image-rendering:pixelated}
+/* The picker previews the same 24 × 25 source cells used in the arena. */
+.avatars { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 7px; }
+.avatars .character-option {
+  position: relative; display: grid; justify-items: center; align-content: start;
+  padding: 4px 2px; margin: 0; border: 2px solid var(--edge); border-radius: 4px;
+  color: var(--muted); background: #0e202a; cursor: pointer;
+}
+.avatars .character-option:has(:checked) {
+  border-color: var(--mint); background: #223c36; color: var(--mint);
+  box-shadow: inset 0 -3px #486846;
+}
+.character-option:has(:focus-visible) { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.character-option:has(:checked)::after {
+  content: ''; position: absolute; right: 5px; top: 5px; width: 4px; height: 8px;
+  border: solid var(--mint); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.character-portrait, .character-frame { display: block; width: 48px; height: 50px; }
+.character-frame { image-rendering: pixelated; background-repeat: no-repeat; background-size: 480px 400px; }
+.character-name { font-size: 12px; text-align: center; line-height: 1.2; }
+@media (prefers-reduced-motion: no-preference) {
+  .character-option:has(:checked) .character-frame {
+    background-position-y: -200px; animation: character-walk .75s steps(10) infinite;
+  }
+}
+@keyframes character-walk { from { background-position-x: 0; } to { background-position-x: -480px; } }
+.preview-player{background:url('/assets/characters/char-green.png') 0 -200px/480px 400px;image-rendering:pixelated}
 .preview-player.p2{left:30%;top:80px;background-image:url('/assets/characters/char-panda.png');animation-delay:-.5s}
 img[src*="/assets/avatar-"]{image-rendering:pixelated}
 .vs-side .vs-char{display:block;width:72px;height:75px;background-repeat:no-repeat;background-size:720px 600px;background-position:0 -300px;image-rendering:pixelated;animation:vsRun .5s steps(10) infinite}@keyframes vsRun{to{background-position-x:-720px}}
 .vs-side small{text-transform:capitalize}
+
+#arena { touch-action: none; }
+#vision-mask {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--sight-x) var(--sight-y),
+    transparent 0 13%, rgba(9, 14, 30, .75) 18%, #090e1e 25%);
+}
+#shoot-button { font-size: .85rem; padding: .4rem .7rem; }
+#shoot-button:disabled { cursor: default; }
+.score-player .effects { height: auto; min-height: 23px; white-space: normal; }

@@ -66,7 +66,7 @@ Website/dinosaur_game.html and whackamole.html
 ASSETS AND LICENSES
 
 From the supplied lab3_gem_rush folder, bundled without visual/audio changes:
-  object_sprites.png, background.png,
+  player_sprite.png (restored as characters/char-green.png), object_sprites.png, background.png,
   collect.mp3, background.mp3, gameover.mp3, press-start-2p.ttf.
   The supplied material did not identify a separate author/license for the
   sprite, background and audio assets; no additional rights are asserted here.
@@ -78,13 +78,17 @@ jQuery 3.6.1: OpenJS Foundation and contributors, MIT license.
   Local browser copy: public/vendor/jquery-3.6.1.min.js.
   Supplied original license: public/assets/JQUERY-LICENSE.txt.
 
-Characters: the lab's player_sprite.png has been replaced by 8 original
+Characters: the original lab hero is available alongside 8 original
   pixel-art characters (fox, cat, frog, owl, bunny, bear, panda, penguin), each
   with a main and an alternate colour sheet in public/assets/characters/. They
   keep the lab sheet's 24x25 frame size and row order, so the lab Player and
   Sprite modules still drive them. They and the matching avatar-*.svg icons were
   generated for this project by asset-tools/make_characters.py (Python + Pillow);
   the finished PNG/SVG files are bundled, so no generation step is needed.
+Green Ranger uses the supplied lab sheet. Ember Courier's original helmet,
+  lantern and directional animation, the new character portraits, grapefruit,
+  laser pickup and bolt are bundled PNGs. asset-tools/make_glade_art.py draws
+  the new artwork with Pillow and prepares alternate palettes.
 New local artwork: boots.svg and ice.svg were drawn specifically for this project.
 New sound effects: fire-hit.wav, power-up.wav, countdown.mp3, go.mp3,
   freeze.mp3, cheat.mp3 and win.mp3 were synthesized during development

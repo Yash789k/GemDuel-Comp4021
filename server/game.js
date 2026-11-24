@@ -1,6 +1,7 @@
 'use strict';
 const { randomUUID } = require('node:crypto');
 const defaults = require('./config');
+const powerKinds = ['boots', 'ice', 'grapefruit', 'laser'];
 const zeroInput = () => ({ x: 0, y: 0 });
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -19,6 +20,7 @@ class Game {
     this.gems = [];
     this.fires = [];
     this.powers = [];
+    this.projectiles = [];
     this.ready = new Set();
     this.rematch = new Set();
     this.departed = new Set();
@@ -26,8 +28,9 @@ class Game {
       ...user, x: index === 0 ? 210 : 650, y: 295, radius: config.radius,
       facing: index === 0 ? 'Right' : 'Left', moving: false, connected: true,
       score: 0, input: zeroInput(), inputAt: 0, bootsUntil: 0,
+      growthUntil: 0, laserShots: 0, laserLockUntil: 0, visionUntil: 0,
       stunUntil: 0, freezeUntil: 0, fireUntil: 0, cheat: false,
-      stats: { green: 0, red: 0, yellow: 0, purple: 0, gems: 0, boots: 0, ice: 0, powers: 0, fireHits: 0, pointsLost: 0, frozen: 0, freezesLanded: 0, bestStreak: 0, distance: 0, usedCheat: false }, streak: 0
+      stats: { green: 0, red: 0, yellow: 0, purple: 0, gems: 0, boots: 0, ice: 0, grapefruit: 0, laser: 0, powers: 0, fireHits: 0, pointsLost: 0, frozen: 0, freezesLanded: 0, bestStreak: 0, distance: 0, usedCheat: false }, streak: 0
     }));
   }
   player(username) { return this.players.find(p => p.username === username); }
@@ -93,7 +96,9 @@ class Game {
   spawnPower(now) {
     if (this.powers.length >= this.config.maxPowers) return;
     const point = this.spot(14);
-    if (point) this.powers.push({ id: `p${++this.nextId}`, ...point, radius: 14, kind: this.random() < .5 ? 'boots' : 'ice', expiresAt: now + this.config.powerLifetime });
+    if (!point) return;
+    const kind = powerKinds[Math.floor(this.random() * powerKinds.length)];
+    this.powers.push({ id: `p${++this.nextId}`, ...point, radius: 14, kind, expiresAt: now + this.config.powerLifetime });
   }
   addFire() {
     const point = this.spot(14);
@@ -123,10 +128,49 @@ class Game {
       this.clamp(a); this.clamp(b);
     }
   }
-  eligible(entity, now) {
+  shoot(username, now) {
+    const owner = this.player(username);
+    if (this.phase !== 'playing' || now >= this.endAt || !owner?.connected || !owner.laserShots) return false;
+    const target = this.players.find(p => p !== owner);
+    const angle = Math.atan2(target.y - owner.y, target.x - owner.x);
+    owner.laserShots--;
+    this.projectiles.push({
+      id: `l${++this.nextId}`, owner: username, target: target.username,
+      x: owner.x, y: owner.y, angle, expiresAt: now + this.config.laserLifetime
+    });
+    return true;
+  }
+  advanceProjectiles(now, dt) {
+    const travel = this.config.laserSpeed * dt;
+    this.projectiles = this.projectiles.filter(bolt => {
+      if (now >= bolt.expiresAt) return false;
+      const target = this.player(bolt.target);
+      if (target.connected) {
+        bolt.angle = Math.atan2(target.y - bolt.y, target.x - bolt.x);
+        // Look along this step before moving: fast bolts cannot skip through the target.
+        if (distance(bolt, target) <= target.radius + travel) {
+          target.laserLockUntil = now + this.config.laserLockDuration;
+          target.visionUntil = now + this.config.laserVisionDuration;
+          target.moving = false;
+          this.event('laser-hit', target, now, { owner: bolt.owner });
+          return false;
+        }
+      }
+      bolt.x += Math.cos(bolt.angle) * travel;
+      bolt.y += Math.sin(bolt.angle) * travel;
+      return true;
+    });
+  }
+  eligible(entity, now, allowExtendedGemReach = false) {
     // Contested pickups: nearest eligible body wins; exact distance ties use the
     // original FIFO match slot. One server removes the entity exactly once.
-    return this.players.filter(p => p.connected && p.stunUntil <= now && p.freezeUntil <= now && distance(p, entity) <= p.radius + entity.radius)
+    return this.players.filter(p => {
+      if (!p.connected || p.stunUntil > now || p.freezeUntil > now) return false;
+      // Double the complete center-to-center gem reach, leaving every other body unchanged.
+      const reach = p.radius + entity.radius;
+      const growingForGem = allowExtendedGemReach && p.growthUntil > now;
+      return distance(p, entity) <= (growingForGem ? reach * 2 : reach);
+    })
       .sort((a, b) => distance(a, entity) - distance(b, entity) || this.players.indexOf(a) - this.players.indexOf(b))[0];
   }
   step(now, dt = this.config.step / 1000) {
@@ -138,7 +182,7 @@ class Game {
     for (const p of this.players) {
       if (!p.connected || now - p.inputAt > this.config.inputTimeout) this.clearInput(p);
       const { x, y } = p.input, length = Math.hypot(x, y);
-      p.moving = length > 0 && p.stunUntil <= now && p.freezeUntil <= now;
+      p.moving = length > 0 && p.stunUntil <= now && p.freezeUntil <= now && p.laserLockUntil <= now;
       if (p.moving) {
         // Adapted lab directional movement, now normalized and based on time.
         const speed = this.config.speed * (p.cheat ? 2 : p.bootsUntil > now ? 1.5 : 1);
@@ -150,6 +194,7 @@ class Game {
       }
     }
     this.resolvePlayers();
+    this.advanceProjectiles(now, dt);
     const remaining = this.endAt - now;
     const waves = (this.config.fireWaves || []).filter(t => remaining <= t).length;
     while (this.waves < waves) {
@@ -180,7 +225,7 @@ class Game {
     this.gems = this.gems.filter(g => g.expiresAt > now);
     this.powers = this.powers.filter(p => p.expiresAt > now);
     for (const gem of [...this.gems]) {
-      const p = this.eligible(gem, now);
+      const p = this.eligible(gem, now, true);
       if (!p) continue;
       this.gems.splice(this.gems.indexOf(gem), 1);
       const points = this.config.gemValues[gem.color] * (p.cheat ? 3 : 1);
@@ -196,7 +241,9 @@ class Game {
       p.stats[power.kind]++; p.stats.powers++;
       let extra = {};
       if (power.kind === 'boots') p.bootsUntil = now + this.config.bootsDuration;
-      else {
+      else if (power.kind === 'grapefruit') p.growthUntil = now + this.config.growthDuration;
+      else if (power.kind === 'laser') p.laserShots++;
+      else if (power.kind === 'ice') {
         const opponent = this.players.find(other => other !== p);
         if (!opponent.cheat) { opponent.freezeUntil = now + this.config.freezeDuration; opponent.stats.frozen++; opponent.moving = false; opponent.streak = 0; p.stats.freezesLanded++; }
         extra = { target: opponent.username, targetX: opponent.x, targetY: opponent.y, blocked: opponent.cheat };
@@ -215,6 +262,15 @@ class Game {
     const p = this.player(username);
     if (p) { p.connected = true; delete p.disconnectedAt; this.clearInput(p); }
   }
+  clearEffects() {
+    this.projectiles.length = 0;
+    for (const p of this.players) {
+      this.clearInput(p);
+      p.growthUntil = p.laserShots = p.laserLockUntil = p.visionUntil = 0;
+      p.bootsUntil = p.stunUntil = p.freezeUntil = p.fireUntil = 0;
+      p.cheat = false;
+    }
+  }
   finish(reason, now, winner) {
     if (this.phase === 'finished' || this.phase === 'cancelled') return false;
     if (winner === undefined) {
@@ -222,7 +278,7 @@ class Game {
       winner = a.score === b.score ? null : a.score > b.score ? a.username : b.username;
     }
     this.phase = 'finished'; this.finishedAt = now;
-    this.players.forEach(p => this.clearInput(p));
+    this.clearEffects();
     this.result = {
       matchId: this.id, reason, winner, endedAt: now,
       players: this.players.map(p => ({ username: p.username, name: p.name, avatar: p.avatar, score: p.score, stats: { ...p.stats, distance: Math.round(p.stats.distance) }, outcome: winner === null ? 'draw' : winner === p.username ? 'win' : 'loss' }))
@@ -232,7 +288,8 @@ class Game {
   snapshot(now) {
     return { matchId: this.id, phase: this.phase, tick: this.tick, serverTime: now, startAt: this.startAt || null, endAt: this.endAt || null, target: this.config.target, frenzy: !!this.frenzy,
       players: this.players.map(({ input, inputAt, ...p }) => ({ ...p, stats: { ...p.stats, distance: Math.round(p.stats.distance) } })),
-      gems: this.gems.map(g => ({ ...g })), fires: this.fires.map(f => ({ ...f })), powers: this.powers.map(p => ({ ...p })) };
+      gems: this.gems.map(g => ({ ...g })), fires: this.fires.map(f => ({ ...f })), powers: this.powers.map(p => ({ ...p })),
+      projectiles: this.projectiles.map(bolt => ({ ...bolt })) };
   }
 }
 module.exports = { Game, distance };

@@ -1,11 +1,12 @@
 'use strict';
 // Optional browser QA. Uses an isolated data directory and real UI/keyboard input.
-// Server state is observed for assertions/navigation, never modified by this test.
+// One rematch uses deterministic server-side pickup fixtures; other rounds use ordinary spawns.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { createGameServer } = require('../game_server');
+const { observeCanvas, verifyPowerups } = require('./browser-powerups.cjs');
 let chromium;
 try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
 catch { console.error('Optional browser test needs Playwright: npm install --no-save playwright; npx playwright install chromium'); process.exit(1); }
@@ -19,6 +20,10 @@ async function until(fn, timeout = 10000) {
 (async () => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemrush-browser-'));
   const output = path.resolve(__dirname, '../test-output'); await fs.mkdir(output, { recursive: true });
+  const passwordHash = await require('argon2').hash('legacy-password');
+  await fs.writeFile(path.join(dataDir, 'accounts.json'), JSON.stringify([
+    { username: 'legacy', name: 'Returning player', passwordHash }
+  ]));
   const server = await createGameServer({ dataDir });
   const address = await server.listen(0, '127.0.0.1'); const base = `http://127.0.0.1:${address.port}`;
   let browser; const errors = [], failures = [], checks = [];
@@ -26,6 +31,7 @@ async function until(fn, timeout = 10000) {
   try {
     browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
     const contexts = await Promise.all([browser.newContext({ viewport: { width: 1366, height: 900 } }), browser.newContext({ viewport: { width: 1366, height: 900 } })]);
+    await Promise.all(contexts.map(context => context.addInitScript(observeCanvas)));
     const [a, b] = await Promise.all(contexts.map(context => context.newPage()));
     for (const page of [a, b]) {
       page.on('pageerror', e => errors.push(e.message));
@@ -47,6 +53,7 @@ async function until(fn, timeout = 10000) {
     await a.locator('#rules-button').click(); assert.equal(await a.locator('#rules-dialog').isVisible(), true); await a.locator('#close-rules').click();
     async function register(page, username, name, avatar) {
       await page.locator('#register-tab').click();
+      assert.equal(await page.locator('input[name=avatar]:checked').inputValue(), 'green');
       await page.locator('#register-username').fill(username); await page.locator('#register-name').fill(name);
       await page.locator(`label:has(input[value="${avatar}"])`).click();
       await page.locator('#register-password').fill('browser-password'); await page.locator('#register-confirm').fill('browser-password');
@@ -55,7 +62,7 @@ async function until(fn, timeout = 10000) {
       await page.locator('#signin-password').fill('browser-password'); await page.locator('#signin-form button').click();
       await page.locator('#lobby-panel').waitFor({ state: 'visible' }); await until(() => page.locator('#find-button').isEnabled());
     }
-    await register(a, 'browser_alice', 'Jade Runner', 'fox'); await register(b, 'browser_bob', 'Amber Scout', 'owl');
+    await register(a, 'browser_alice', 'Jade Runner', 'ember'); await register(b, 'browser_bob', 'Amber Scout', 'green');
     await until(async () => await a.locator('#online-players li').count() === 2);
     await a.reload(); await a.locator('#lobby-panel').waitFor({ state: 'visible' }); await until(() => a.locator('#find-button').isEnabled());
     assert.equal(await a.locator('#my-name').textContent(), 'Jade Runner');
@@ -107,7 +114,7 @@ async function until(fn, timeout = 10000) {
     await steer(0, 0); assert.equal(game.phase, 'finished'); assert.equal(game.result.reason, 'target'); assert.equal(game.result.winner, 'browser_alice');
     await a.locator('#results-view').waitFor({ state: 'visible' }); await b.locator('#results-view').waitFor({ state: 'visible' });
     assert.equal(await a.locator('#result-title').textContent(), 'You win!'); assert.equal(await b.locator('#result-title').textContent(), 'Good duel.');
-    assert.ok(game.result.players[0].score >= 50); assert.equal(await a.locator('#stats-body tr').count(), 17);
+    assert.ok(game.result.players[0].score >= 50); assert.equal(await a.locator('#stats-body tr').count(), 19);
     assert.equal(await a.locator('#leaderboard li').count(), 2);
     assert.equal(await a.locator('#stats-body').textContent(), await b.locator('#stats-body').textContent());
     await a.screenshot({ path: path.join(output, 'results.png'), fullPage: true });
@@ -124,6 +131,8 @@ async function until(fn, timeout = 10000) {
     const third = server.manager.membership.get('browser_alice'); assert.notEqual(third.id, rematch.id);
     await a.keyboard.press('c'); await until(() => third.player('browser_alice').cheat);
     await delay(250); assert.equal(third.player('browser_alice').cheat, true);
+    await verifyPowerups(a, b, third, until);
+    passed('Both clients draw chosen characters, growth, pickups and homing bolt; drag, F and button work and only the hit player loses vision');
     await b.locator('#leave-button').click(); await a.locator('#results-view').waitFor({ state: 'visible' });
     await a.locator('#rematch-button').click(); await b.locator('#home-button').click(); await b.locator('#lobby-panel').waitFor({ state: 'visible' });
     await until(() => a.locator('#rematch-button').isDisabled());
@@ -131,6 +140,24 @@ async function until(fn, timeout = 10000) {
     await a.locator('#signout-button').click(); await a.locator('#auth-panel').waitFor({ state: 'visible' });
     assert.equal(await a.locator('#notice').isVisible(), false);
     passed('two rematches, fresh state, immediate forfeits, rematch cancellation, home and sign-out');
+    // Sign a pre-avatar account back in from disk, then inspect its actual match sheet.
+    await a.locator('#signin-username').fill('legacy');
+    await a.locator('#signin-password').fill('legacy-password');
+    await a.locator('#signin-form button').click();
+    await a.locator('#find-button').click();
+    await b.locator('#find-button').click();
+    await until(() => server.manager.membership.get('legacy')?.phase === 'playing');
+    const legacyMatch = server.manager.membership.get('legacy');
+    assert.equal(legacyMatch.player('legacy').avatar, 'green');
+    for (const page of [a, b]) {
+      await until(() => page.evaluate(() => window.drawnSprites['char-green.png'] && window.drawnSprites['char-green-alt.png']));
+    }
+    await a.locator('#leave-button').click();
+    await a.locator('#results-view').waitFor({ state: 'visible' });
+    await a.locator('#home-button').click();
+    await a.locator('#signout-button').click();
+    await a.locator('#auth-panel').waitFor({ state: 'visible' });
+    passed('pre-avatar account signs in, pairs and renders Green Ranger in both sessions');
     await a.setViewportSize({ width: 1280, height: 720 });
     await a.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await a.screenshot({ path: path.join(output, 'laptop.png'), fullPage: true });

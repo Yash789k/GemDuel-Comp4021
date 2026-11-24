@@ -1,49 +1,27 @@
-// Adapted from lab3_gem_rush/player.js. Fixed-step movement is in server/game.js.
-// This function defines the Player module.
-// - `ctx` - A canvas context for drawing
-// - `x` - The initial x position of the player
-// - `y` - The initial y position of the player
-// - `gameArea` - The bounding box of the game area
-// - `sheetUrl` - The character sprite sheet chosen from the player's avatar
+// Adapted from lab3_gem_rush/player.js. All sheets follow its eight directional rows.
 const Player = function(ctx, x, y, sheetUrl) {
-
-    // This is the sprite sequences of the player facing different directions.
-    // It contains the idling sprite sequences `idleLeft`, `idleUp`, `idleRight` and `idleDown`,
-    // and the moving sprite sequences `moveLeft`, `moveUp`, `moveRight` and `moveDown`.
-    // The character sheets keep the lab's 24x25 frames and row order. Idle rows
-    // now have 8 looping frames (a small breathe and a blink every 2 seconds).
-    const sequences = {
-        /* Idling sprite sequences for facing different directions */
-        idleLeft:  { x: 0, y: 25, width: 24, height: 25, count: 8, timing: 250, loop: true },
-        idleUp:    { x: 0, y: 50, width: 24, height: 25, count: 8, timing: 250, loop: true },
-        idleRight: { x: 0, y: 75, width: 24, height: 25, count: 8, timing: 250, loop: true },
-        idleDown:  { x: 0, y:  0, width: 24, height: 25, count: 8, timing: 250, loop: true },
-
-        /* Moving sprite sequences for facing different directions */
-        moveLeft:  { x: 0, y: 125, width: 24, height: 25, count: 10, timing: 50, loop: true },
-        moveUp:    { x: 0, y: 150, width: 24, height: 25, count: 10, timing: 50, loop: true },
-        moveRight: { x: 0, y: 175, width: 24, height: 25, count: 10, timing: 50, loop: true },
-        moveDown:  { x: 0, y: 100, width: 24, height: 25, count: 10, timing: 50, loop: true }
-    };
-
-    // This is the sprite object of the player created from the Sprite module.
     const sprite = Sprite(ctx, x, y);
-
-    // The sprite object is configured for the player sprite here.
-    sprite.setSequence(sequences.idleDown)
-          .setScale(1.9)
-          .setShadowScale({ x: 0.75, y: 0.20 })
-          .useSheet(sheetUrl || "/assets/characters/char-fox.png");
-
-    // Network state selects animation only when direction or motion changes.
-    let animation = "idleDown";
-    const sync = function(player) {
-        const next = (player.moving ? "move" : "idle") + player.facing;
+    const sequences = {};
+    const original = sheetUrl.includes('/char-green');
+    for (const [row, facing] of ['Down', 'Left', 'Up', 'Right'].entries()) {
+        // The restored green sheet has three idle frames, and just one facing up.
+        const count = original ? (facing === 'Up' ? 1 : 3) : 8;
+        sequences['idle' + facing] = { x: 0, y: row * 25, width: 24, height: 25,
+            count, timing: original ? 800 : 250, loop: true };
+        sequences['move' + facing] = { x: 0, y: (row + 4) * 25, width: 24, height: 25,
+            count: 10, timing: 50, loop: true };
+    }
+    let animation = 'idleDown';
+    sprite.setSequence(sequences[animation]).setScale(2)
+        .setShadowScale({ x: .75, y: .20 }).useSheet(sheetUrl);
+    function sync(player, scaleMultiplier = 1) {
+        const next = (player.moving ? 'move' : 'idle') + player.facing;
         if (next !== animation) {
             sprite.setSequence(sequences[next]);
             animation = next;
         }
-        sprite.setXY(player.x, player.y - 10);
-    };
+        // Keep the bottom of the 25px frame on the same baseline as it grows.
+        sprite.setScale(2 * scaleMultiplier).setXY(player.x, player.y + 14 - 25 * scaleMultiplier);
+    }
     return { sync, draw: sprite.draw, update: sprite.update };
 };

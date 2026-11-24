@@ -39,7 +39,7 @@
             </form>
             <form id="register-form" hidden>
               <div class="form-row"><div><label for="register-username">Username</label><input id="register-username" name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required placeholder="Letters, digits, _"></div><div><label for="register-name">Display name</label><input id="register-name" name="name" maxlength="24" required placeholder="What rivals see"></div></div>
-              <fieldset><legend>Choose your avatar</legend><div id="avatar-options" class="avatars"></div></fieldset>
+              <fieldset><legend>Choose your character</legend><div id="avatar-options" class="avatars"></div></fieldset>
               <label for="register-password">Password <span class="muted">(8–128 characters)</span></label><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
               <label for="register-confirm">Confirm password</label><input id="register-confirm" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
               <button class="primary wide" type="submit">Create account</button>
@@ -64,8 +64,8 @@
     <section id="game-view" hidden>
       <div class="game-heading"><span class="eyebrow">THE GEM GLADE <span id="match-phase"></span></span><button id="leave-button" class="quiet danger">Leave match (forfeit)</button></div>
       <div class="scoreboard"><div id="player-zero" class="score-player mint"></div><div class="timer-block"><span class="eyebrow">FIRST TO 50</span><strong id="game-time">2:00</strong><span id="game-status">Loading arena…</span></div><div id="player-one" class="score-player peach"></div></div>
-      <div class="arena-wrap"><canvas id="arena" width="854" height="480" aria-label="Live two-player Gem Rush Duel arena"></canvas><div id="cheat-banner" hidden>CHEAT MODE ON</div><div id="arena-overlay" class="arena-overlay"><div id="vs-row" class="vs-row"></div><p id="overlay-detail">Loading arena…</p><strong id="countdown"></strong></div></div>
-      <div class="game-footer"><span><kbd>W A S D</kbd> / <kbd>↑ ← ↓ →</kbd> Move</span><span><kbd>C</kbd> Toggle cheat</span><span class="gem-legend"><i class="dot green"></i>1 <i class="dot red"></i>2 <i class="dot yellow"></i>3 <i class="dot purple"></i>5</span><span id="connection-status">Connected</span></div>
+      <div class="arena-wrap"><canvas id="arena" width="854" height="480" aria-label="Live two-player Gem Rush Duel arena"></canvas><div id="vision-mask" hidden aria-hidden="true"></div><div id="cheat-banner" hidden>CHEAT MODE ON</div><div id="arena-overlay" class="arena-overlay"><div id="vs-row" class="vs-row"></div><p id="overlay-detail">Loading arena…</p><strong id="countdown"></strong></div></div>
+      <div class="game-footer"><span><kbd>W A S D</kbd> / <kbd>↑ ← ↓ →</kbd> Move or drag your character</span><span><kbd>C</kbd> Toggle cheat</span><button id="shoot-button" type="button" class="secondary" disabled>Fire laser <kbd>F</kbd> · <span id="shot-count">0</span></button><span class="gem-legend"><i class="dot green"></i>1 <i class="dot red"></i>2 <i class="dot yellow"></i>3 <i class="dot purple"></i>5</span><span id="connection-status">Connected</span></div>
       <p id="match-message" class="match-message" role="status" aria-live="polite"></p>
     </section>
     <section id="results-view" hidden>
@@ -78,13 +78,13 @@
   <template id="rules-template">
     <div class="rules-grid">
       <article><h3><span>◆</span> Chase the shine</h3><p>Collect green <b>1</b>, red <b>2</b>, yellow <b>3</b>, and purple <b>5</b> point gems. They vanish after 6 seconds. Only one player gets each gem.</p></article>
-      <article><h3><img src="/assets/boots.svg" alt=""> Take the advantage</h3><p><b>Speed Boots:</b> 1.5× speed for 5 seconds. <b>Ice Crystal:</b> freezes your rival for 2 seconds. Pickups activate automatically; repeats refresh the duration.</p></article>
+      <article><h3><img src="/assets/boots.svg" alt=""> Take the advantage</h3><p><b>Speed Boots:</b> 1.5× speed for 5 seconds. <b>Ice Crystal:</b> freezes your rival for 2 seconds. <b>Grapefruit:</b> doubles your size and gem reach for 5 seconds. Another fruit refreshes the timer. <b>Laser:</b> stores one homing shot. Press <kbd>F</kbd> or select Fire laser to lock your rival in place for 1 second and narrow their view for 2 seconds.</p></article>
       <article><h3><span class="fire-icon">♨</span> Mind the fire</h3><p>Moving fire costs <b>2 points</b> and stuns you for <b>1 second</b>, with a 1.5-second hit cooldown. Scores never go below zero. Frozen or stunned players cannot move or collect. <b>The heat rises:</b> an extra fire joins when 1:00 and 0:30 remain.</p></article>
-      <article><h3><kbd>WASD</kbd> Make your move</h3><p>Use <b>WASD or arrow keys</b>. Players can block each other. First to <b>50 points</b> wins. After <b>2 minutes</b>, the higher score wins; equal scores draw. <b>Gem Frenzy:</b> in the final 20 seconds gems appear twice as fast. Chain gems without getting hit for a streak bonus on the results page!</p></article>
+      <article><h3><kbd>WASD</kbd> Make your move</h3><p>Use <b>WASD or arrow keys</b>, or drag your character toward a pickup. Players can block each other. First to <b>50 points</b> wins. After <b>2 minutes</b>, the higher score wins; equal scores draw. <b>Gem Frenzy:</b> in the final 20 seconds gems appear twice as fast. Chain gems without getting hit for a streak bonus on the results page!</p></article>
     </div>
     <details class="cheat-guide"><summary><kbd>C</kbd> The not-so-secret cheat code</summary><p>Press C once to enable, again to disable. <b>CHEAT MODE ON</b> gives 2× speed, 3× gem points, and immunity to fire and ice. It clears current stun and freeze. Cheat speed overrides boots while their 5-second timer keeps running. Turning cheat off restores any unexpired boots; cleared effects stay cleared. Cheat use is shown in results and completed matches count on the leaderboard.</p></details>
     <p class="rules-note">A dropped connection has 10 seconds to return; the match clock keeps running. Leaving or signing out during play forfeits immediately. Both players must request a rematch.</p>
   </template>
-  <script src="/vendor/jquery-3.6.1.min.js"></script><script src="/socket.io/socket.io.js"></script><script src="/scripts/sprite.js"></script><script src="/scripts/player.js"></script><script src="/scripts/gem.js"></script><script src="/scripts/fire.js"></script><script src="/scripts/render.js"></script><script src="/scripts/audio.js"></script><script src="/scripts/app.js"></script>
+  <script src="/vendor/jquery-3.6.1.min.js"></script><script src="/socket.io/socket.io.js"></script><script src="/scripts/sprite.js"></script><script src="/scripts/characters.js"></script><script src="/scripts/player.js"></script><script src="/scripts/gem.js"></script><script src="/scripts/fire.js"></script><script src="/scripts/render.js"></script><script src="/scripts/audio.js"></script><script src="/scripts/app.js"></script>
 </body>
 </html>

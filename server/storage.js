@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const Characters = require('../public/scripts/characters');
 
 // One serialized write queue per file. Publish the in-memory copy only after an
 // atomic rename succeeds, so a failed disk write cannot masquerade as a save.
@@ -43,12 +44,12 @@ class JsonFile {
 
 async function openStorage(directory) {
   const accounts = await new JsonFile(path.join(directory, 'accounts.json'), [],
-    value => Array.isArray(value) && value.every(u => u && typeof u.username === 'string' && typeof u.passwordHash === 'string' && typeof u.name === 'string' && typeof u.avatar === 'string') && new Set(value.map(u => u.username)).size === value.length).open();
+    value => Array.isArray(value) && value.every(u => u && typeof u.username === 'string' && typeof u.passwordHash === 'string' && typeof u.name === 'string' && (u.avatar == null || typeof u.avatar === 'string')) && new Set(value.map(u => u.username)).size === value.length).open();
   const rankings = await new JsonFile(path.join(directory, 'leaderboard.json'), { records: [], completed: [] },
-    value => value && Array.isArray(value.records) && Array.isArray(value.completed) && value.completed.every(x => typeof x === 'string') && value.records.every(r => r && typeof r.username === 'string' && typeof r.name === 'string' && typeof r.avatar === 'string' && Number.isInteger(r.bestScore) && r.bestScore >= 0 && Number.isInteger(r.wins) && r.wins >= 0)).open();
-  const publicUser = user => ({ username: user.username, name: user.name, avatar: user.avatar });
+    value => value && Array.isArray(value.records) && Array.isArray(value.completed) && value.completed.every(x => typeof x === 'string') && value.records.every(r => r && typeof r.username === 'string' && typeof r.name === 'string' && (r.avatar == null || typeof r.avatar === 'string') && Number.isInteger(r.bestScore) && r.bestScore >= 0 && Number.isInteger(r.wins) && r.wins >= 0)).open();
+  const publicUser = user => ({ username: user.username, name: user.name, avatar: Characters.idFor(user.avatar) });
   const sorted = () => rankings.value.records.slice().sort((a, b) => b.bestScore - a.bestScore || b.wins - a.wins || (a.username < b.username ? -1 : a.username > b.username ? 1 : 0))
-    .map(r => ({ ...r, games: r.games || 0 }));
+    .map(r => ({ ...r, avatar: Characters.idFor(r.avatar), games: r.games || 0 }));
   const top = () => sorted().slice(0, 10);
   // All-time position (1-based) of every listed player, for the results page.
   const ranks = usernames => Object.fromEntries(usernames.map(u => [u, sorted().findIndex(r => r.username === u) + 1]));

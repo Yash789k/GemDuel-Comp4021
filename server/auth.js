@@ -3,7 +3,8 @@ const argon2 = require('argon2');
 const session = require('express-session');
 const { randomBytes } = require('node:crypto');
 // Each avatar is also the player's in-game character (public/assets/characters).
-const AVATARS = ['fox', 'cat', 'frog', 'owl', 'bunny', 'bear', 'panda', 'penguin'];
+const Characters = require('../public/scripts/characters');
+const AVATARS = Object.keys(Characters.names);
 
 // Adapted from game_room/game_server.js: same routes, Argon2 and session flow.
 // Passwords are deliberately neither trimmed nor logged.

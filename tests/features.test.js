@@ -71,15 +71,32 @@ test('leaderboard counts games and reports all-time ranks', async () => {
   assert.equal(storage.total(), 2);
 });
 
-test('all eight characters are valid avatars and each has both sprite sheets and an icon', () => {
+test('legacy animals, Green Ranger and Ember Courier all have selectable sheets and icons', () => {
   const { validateRegistration, AVATARS } = require('../server/auth');
-  assert.equal(AVATARS.length, 8);
+  const Characters = require('../public/scripts/characters');
+  assert.deepEqual(new Set(AVATARS), new Set(['green', 'ember', 'fox', 'cat', 'frog', 'owl', 'bunny', 'bear', 'panda', 'penguin']));
+  assert.equal(Characters.idFor(undefined), 'green');
+  assert.equal(Characters.matchSheet([{ avatar: 'ember' }, { avatar: 'ember' }], 1), Characters.sheet('ember', true));
   const base = { username: 'tester', name: 'T', password: 'password1', confirmPassword: 'password1' };
   for (const avatar of AVATARS) {
     assert.equal(validateRegistration({ ...base, avatar }), null);
-    for (const file of [`characters/char-${avatar}.png`, `characters/char-${avatar}-alt.png`, `avatar-${avatar}.svg`]) {
+    for (const file of [`characters/char-${avatar}.png`, `characters/char-${avatar}-alt.png`, Characters.icon(avatar).slice('/assets/'.length)]) {
       assert.ok(require('node:fs').existsSync(path.join(__dirname, '..', 'public', 'assets', file)), file);
     }
   }
   assert.equal(validateRegistration({ ...base, avatar: 'dragon' }), 'Choose an approved avatar.');
+});
+
+
+test('legacy accounts and ranking rows without an avatar resolve to Green Ranger', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemrush-legacy-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const identity = { username: 'old', name: 'Old player' };
+  await fs.writeFile(path.join(dir, 'accounts.json'), JSON.stringify([{ ...identity, passwordHash: 'legacy' }]));
+  await fs.writeFile(path.join(dir, 'leaderboard.json'), JSON.stringify({
+    records: [{ ...identity, wins: 1, bestScore: 10 }], completed: []
+  }));
+  const store = await openStorage(dir);
+  assert.equal(store.publicUser(store.find('old')).avatar, 'green');
+  assert.equal(store.top()[0].avatar, 'green');
 });

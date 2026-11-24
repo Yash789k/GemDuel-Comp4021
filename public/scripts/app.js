@@ -3,7 +3,6 @@
 // socket event -> UI updates adapt hand_game.js. Handlers are installed once.
 $(function() {
   const renderer = ArenaRenderer(document.querySelector('#arena'));
-  const avatarNames = ['fox', 'cat', 'frog', 'owl', 'bunny', 'bear', 'panda', 'penguin'];
   let user = null, socket = null, match = null, result = null;
   let assetsReady = false, clockOffset = 0, bestRtt = Infinity, clockSamples = 0;
   let queued = false, connected = false, superseded = false;
@@ -11,11 +10,13 @@ $(function() {
   const rules = document.querySelector('#rules-template').content;
   document.querySelector('#home-rules').append(rules.cloneNode(true));
   document.querySelector('#dialog-rules').append(rules.cloneNode(true));
-  for (const avatar of avatarNames) {
-    const label = $('<label>').attr('title', avatar);
-    $('<input>').attr({ type: 'radio', name: 'avatar', value: avatar, 'aria-label': avatar }).prop('checked', avatar === 'fox').appendTo(label);
-    $('<img>').attr({ src: `/assets/avatar-${avatar}.svg`, alt: avatar }).appendTo(label);
-    $('<span>').text(avatar).appendTo(label);
+  for (const [id, name] of Object.entries(Characters.names)) {
+    const label = $('<label>').addClass('character-option');
+    $('<input>').attr({ type: 'radio', name: 'avatar', value: id, 'aria-label': name })
+      .prop({ checked: id === Characters.defaultId, defaultChecked: id === Characters.defaultId }).appendTo(label);
+    const portrait = $('<span>').addClass('character-portrait').attr('aria-hidden', 'true').appendTo(label);
+    $('<span>').addClass('character-frame').css('background-image', 'url(' + Characters.sheet(id) + ')').appendTo(portrait);
+    $('<span>').addClass('character-name').text(name).appendTo(label);
     $('#avatar-options').append(label);
   }
   const notice = message => $('#notice').text(message).prop('hidden', !message);
@@ -74,7 +75,7 @@ $(function() {
   function login(identity) {
     user = identity; superseded = false; notice('');
     $('#auth-panel').prop('hidden', true); $('#lobby-panel,#signout-button').prop('hidden', false);
-    $('#my-name').text(user.name); $('#my-avatar').attr('src', `/assets/avatar-${user.avatar}.svg`);
+    $('#my-name').text(user.name); $('#my-avatar').attr('src', Characters.icon(user.avatar));
     showView('#home-view'); connect(); loadLobbyBoard();
   }
   function logout(message) {
@@ -125,7 +126,7 @@ $(function() {
       $('#online-count').text(`${state.players.length} online`); const list = $('#online-players').empty();
       for (const player of state.players) {
         const row = $('<li>');
-        $('<img>').attr({ src: `/assets/avatar-${player.avatar}.svg`, alt: '' }).appendTo(row);
+        $('<img>').attr({ src: Characters.icon(player.avatar), alt: '' }).appendTo(row);
         $('<span>').addClass('name').text(player.name + (player.username === user.username ? ' (you)' : '')).appendTo(row);
         $('<span>').addClass('status').text(player.status).appendTo(row); list.append(row);
       }
@@ -143,15 +144,15 @@ $(function() {
         // Show the animated character itself (alt colours when both picked the same one).
         const same = match.players[0].avatar === match.players[1].avatar;
         $('<span>').addClass('vs-char').attr('role', 'img').attr('aria-label', p.avatar)
-          .css('background-image', `url(/assets/characters/char-${p.avatar}${same && i === 1 ? '-alt' : ''}.png)`).appendTo(side);
+          .css('background-image', 'url(' + Characters.matchSheet(match.players, i) + ')').appendTo(side);
         $('<b>').text(p.name + (p.username === user.username ? ' (you)' : '')).appendTo(side);
-        $('<small>').text(`${p.avatar}${same && i === 1 ? ' · alt colours' : ''}`).appendTo(side);
+        $('<small>').text(`${Characters.names[Characters.idFor(p.avatar)]}${same && i === 1 ? ' · alt colours' : ''}`).appendTo(side);
         vs.append(side);
       });
       $('#arena-overlay').prop('hidden', false); $('#match-message').text('Loading the arena for both players…');
       buildScoreboard();
       const id = match.matchId;
-      try { await renderer.ready; if (match?.matchId === id && match.phase === 'loading') socket.emit('match:ready', { matchId: id }); }
+      try { await renderer.loadCharacters(match.players); if (match?.matchId === id && match.phase === 'loading') socket.emit('match:ready', { matchId: id }); }
       catch (error) { notice(error.message); }
     });
     socket.on('match:countdown', acceptSnapshot);
@@ -192,7 +193,7 @@ $(function() {
   function renderBoard(target, board, limit = 10) {
     const list = $(target).empty();
     board.slice(0, limit).forEach(p => {
-      const row = $('<li>').toggleClass('me', !!user && p.username === user.username).append($('<img>').attr({ src: `/assets/avatar-${p.avatar}.svg`, alt: '' }));
+      const row = $('<li>').toggleClass('me', !!user && p.username === user.username).append($('<img>').attr({ src: Characters.icon(p.avatar), alt: '' }));
       row.append($('<span>').addClass('leader-name').text(p.name + (user && p.username === user.username ? ' (you)' : '')));
       row.append($('<span>').addClass('leader-score').text(p.bestScore).append($('<small>').text(`${p.wins} ${p.wins === 1 ? 'win' : 'wins'} · ${p.games || 0} played`)));
       list.append(row);
@@ -203,12 +204,13 @@ $(function() {
   function acceptSnapshot(snapshot) {
     if (!match || snapshot.matchId !== match.matchId || snapshot.tick < match.tick || result) return;
     match = snapshot; renderer.snapshot(snapshot);
+    if (dragTarget) sendInput();
   }
   function buildScoreboard() {
     match.players.forEach((p, index) => {
       const root = $(index === 0 ? '#player-zero' : '#player-one').empty();
       const line = $('<div>').addClass('score-line');
-      $('<img>').attr({ src: `/assets/avatar-${p.avatar}.svg`, alt: p.avatar }).appendTo(line);
+      $('<img>').attr({ src: Characters.icon(p.avatar), alt: p.avatar }).appendTo(line);
       const name = $('<div>').addClass('name').text(p.name);
       $('<span>').addClass('you-label').text(p.username === user.username ? 'YOU' : 'RIVAL').appendTo(name); name.appendTo(line);
       $('<span>').addClass('score-number').text('0').appendTo(line); root.append(line);
@@ -223,12 +225,14 @@ $(function() {
       root.find('.score-number').text(p.score); root.find('.score-fill').css('width', `${Math.min(100, p.score / 50 * 100)}%`);
       const effects = [];
       if (p.cheat) effects.push('CHEAT MODE ON');
-      for (const [field, label] of [['bootsUntil', 'Boots'], ['stunUntil', 'Stun'], ['freezeUntil', 'Freeze']]) if (p[field] > time) effects.push(`${label} ${((p[field] - time) / 1000).toFixed(1)}s`);
+      for (const [field, label] of [['bootsUntil', 'Boots'], ['stunUntil', 'Stun'], ['freezeUntil', 'Freeze'], ['growthUntil', 'Growth'], ['laserLockUntil', 'Laser lock'], ['visionUntil', 'Low vision']]) if (p[field] > time) effects.push(`${label} ${((p[field] - time) / 1000).toFixed(1)}s`);
       root.find('.effects').text(effects.join(' · ') || 'Ready to rush');
     });
     const seconds = match.endAt ? Math.max(0, Math.min(120, Math.ceil((match.endAt - time) / 1000))) : 120;
     $('#game-time').text(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`).toggleClass('low', match.phase === 'playing' && seconds <= 10);
     const local = match.players.find(p => p.username === user.username);
+    $('#shot-count').text(local.laserShots);
+    $('#shoot-button').prop('disabled', !connected || match.phase !== 'playing' || !local.laserShots);
     $('#cheat-banner').prop('hidden', !(local?.cheat && match.phase === 'playing'));
     // Countdown beeps (3, 2, 1), a GO sound, and a tick each second in the last 10 s.
     const count = match.phase === 'countdown' ? Math.max(1, Math.ceil((match.startAt - time) / 1000)) : match.phase === 'playing' ? (seconds <= 10 ? `t${seconds}` : 'go') : null;
@@ -258,7 +262,7 @@ $(function() {
     const holder = $('#match-ranking').empty();
     ranking.forEach((p, i) => {
       const row = $('<div>').addClass('ranking-row'); $('<span>').addClass('rank').text(end.winner === null ? '=1' : i + 1).appendTo(row);
-      $('<img>').attr({ src: `/assets/avatar-${p.avatar}.svg`, alt: '' }).appendTo(row);
+      $('<img>').attr({ src: Characters.icon(p.avatar), alt: '' }).appendTo(row);
       const name = $('<div>').addClass('ranking-name').text(p.name + (p.username === user.username ? ' (you)' : ''));
       $('<small>').text(`${p.outcome.toUpperCase()} · ${p.stats.usedCheat ? 'Cheat used' : 'No cheat used'}`).appendTo(name); row.append(name);
       $('<span>').addClass('ranking-score').text(p.score).appendTo(row); holder.append(row);
@@ -266,7 +270,7 @@ $(function() {
     const head = $('<tr>').append($('<th>').text('Match statistics'));
     end.players.forEach(p => head.append($('<th>').text(p.name))); $('#stats-head').empty().append(head);
     // [label, value, which is better: 1 = higher, -1 = lower, 0 = no highlight]
-    const stats = [['Final score', p => p.score, 1], ['Green gems · 1 pt', p => p.stats.green, 1], ['Red gems · 2 pts', p => p.stats.red, 1], ['Yellow gems · 3 pts', p => p.stats.yellow, 1], ['Purple gems · 5 pts', p => p.stats.purple, 1], ['Total gems', p => p.stats.gems, 1], ['Best gem streak', p => p.stats.bestStreak ?? 0, 1], ['Speed Boots', p => p.stats.boots, 1], ['Ice Crystals', p => p.stats.ice, 1], ['Total power-ups', p => p.stats.powers, 1], ['Rivals frozen', p => p.stats.freezesLanded ?? 0, 1], ['Fire hits', p => p.stats.fireHits, -1], ['Points lost to fire', p => p.stats.pointsLost ?? 0, -1], ['Times frozen', p => p.stats.frozen, -1], ['Distance run (px)', p => p.stats.distance ?? 0, 0], ['Cheat used', p => p.stats.usedCheat ? 'Yes' : 'No', 0], ['Result', p => p.outcome, 0]];
+    const stats = [['Final score', p => p.score, 1], ['Green gems · 1 pt', p => p.stats.green, 1], ['Red gems · 2 pts', p => p.stats.red, 1], ['Yellow gems · 3 pts', p => p.stats.yellow, 1], ['Purple gems · 5 pts', p => p.stats.purple, 1], ['Total gems', p => p.stats.gems, 1], ['Best gem streak', p => p.stats.bestStreak ?? 0, 1], ['Speed Boots', p => p.stats.boots, 1], ['Ice Crystals', p => p.stats.ice, 1], ['Grapefruits', p => p.stats.grapefruit, 1], ['Laser pickups', p => p.stats.laser, 1], ['Total power-ups', p => p.stats.powers, 1], ['Rivals frozen', p => p.stats.freezesLanded ?? 0, 1], ['Fire hits', p => p.stats.fireHits, -1], ['Points lost to fire', p => p.stats.pointsLost ?? 0, -1], ['Times frozen', p => p.stats.frozen, -1], ['Distance run (px)', p => p.stats.distance ?? 0, 0], ['Cheat used', p => p.stats.usedCheat ? 'Yes' : 'No', 0], ['Result', p => p.outcome, 0]];
     const body = $('#stats-body').empty();
     stats.forEach(([label, value, better]) => {
       const row = $('<tr>').append($('<td>').text(label));
@@ -290,27 +294,73 @@ $(function() {
   $('#leave-button').on('click', () => { release(); emitMatch('match:leave'); });
   $('#home-button').on('click', () => { if (connected) emitMatch('match:leave'); else home('Connection lost. Reconnect or sign in to find another match.'); });
   $('#rematch-button').on('click', () => { GameAudio.unlock(); emitMatch('match:rematch'); });
-  function sendInput() {
+  const arena = document.querySelector('#arena');
+  const mask = document.querySelector('#vision-mask');
+  let dragTarget = null, lastDirection = null;
+
+  function pointOnArena(event) {
+    const bounds = arena.getBoundingClientRect();
+    return {
+      x: (event.clientX - bounds.left) * arena.width / bounds.width,
+      y: (event.clientY - bounds.top) * arena.height / bounds.height
+    };
+  }
+  arena.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0 || match?.phase !== 'playing') return;
+    const player = match.players.find(p => p.username === user.username);
+    const point = pointOnArena(event);
+    const scale = player.growthUntil > now() ? 2 : 1;
+    if (Math.abs(point.x - player.x) > 26 * scale ||
+        point.y < player.y - 45 * scale || point.y > player.y + 20) return;
+    arena.setPointerCapture(event.pointerId);
+    dragTarget = point;
+    sendInput();
+  });
+  arena.addEventListener('pointermove', event => {
+    if (!dragTarget || !arena.hasPointerCapture(event.pointerId)) return;
+    dragTarget = pointOnArena(event);
+    sendInput();
+  });
+  arena.addEventListener('lostpointercapture', () => { dragTarget = null; sendInput(); });
+  $('#shoot-button').on('click', () => emitMatch('match:shoot'));
+
+  function sendInput(heartbeat = false) {
     if (!socket?.connected || match?.phase !== 'playing') return;
-    const x = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
-    const y = Number(keys.has('s') || keys.has('arrowdown')) - Number(keys.has('w') || keys.has('arrowup'));
+    let x = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
+    let y = Number(keys.has('s') || keys.has('arrowdown')) - Number(keys.has('w') || keys.has('arrowup'));
+    if (dragTarget && !keys.size) {
+      const player = match.players.find(p => p.username === user.username);
+      const axis = delta => Math.abs(delta) <= 10 ? 0 : Math.sign(delta);
+      x = axis(dragTarget.x - player.x);
+      y = axis(dragTarget.y - player.y);
+    }
+    const direction = x + ',' + y;
+    if (!heartbeat && direction === lastDirection) return;
+    lastDirection = direction;
     socket.emit('match:input', { matchId: match.matchId, x, y });
   }
-  function release() { keys.clear(); sendInput(); }
+  function release() { keys.clear(); dragTarget = null; lastDirection = null; sendInput(); }
   const movementKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'];
   $(document).on('keydown', event => {
     if ($(event.target).is('input,textarea,select,[contenteditable]') || document.querySelector('#rules-dialog').open || match?.phase !== 'playing') return;
     const key = event.key.toLowerCase();
     if (movementKeys.includes(key)) { event.preventDefault(); if (!keys.has(key)) { keys.add(key); sendInput(); } }
+    if (key === 'f' && !event.repeat) { event.preventDefault(); emitMatch('match:shoot'); }
     if (key === 'c' && !event.repeat) { event.preventDefault(); GameAudio.unlock(); emitMatch('match:cheat'); }
   }).on('keyup', event => { if (keys.delete(event.key.toLowerCase())) sendInput(); });
   $(window).on('blur', release);
   document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
   document.querySelector('#rules-dialog').addEventListener('toggle', release);
-  setInterval(sendInput, 200); setInterval(synchronizeClock, 5000);
+  setInterval(() => sendInput(true), 200); setInterval(synchronizeClock, 5000);
   let lastHud = 0, lastCount = null;
   function frame() {
     const time = now();
+    const local = match?.players.find(p => p.username === user?.username);
+    mask.hidden = !(match?.phase === 'playing' && local?.visionUntil > time && !result);
+    if (!mask.hidden) {
+      mask.style.setProperty('--sight-x', (100 * local.x / arena.width) + '%');
+      mask.style.setProperty('--sight-y', (100 * local.y / arena.height) + '%');
+    }
     if (match && !result) { renderer.draw(time, user?.username); if (time - lastHud >= 80) { updateHud(time); lastHud = time; } }
     requestAnimationFrame(frame);
   }

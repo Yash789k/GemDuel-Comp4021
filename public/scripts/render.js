@@ -8,7 +8,7 @@ const ArenaRenderer = function(canvas) {
   let me = null, shakeUntil = 0, lastFrame = performance.now();
   const GEM_COLOURS = { green: '#6be571', red: '#f4606a', yellow: '#ffd75e', purple: '#c08cff' };
   const PLAYER_COLOURS = ['#b9ffad', '#ffbd90'];
-  const resources = ['background.png', 'object_sprites.png', 'boots.svg', 'ice.svg'];
+  const resources = ['background.png', 'object_sprites.png', 'boots.svg', 'ice.svg', 'grapefruit.png', 'laser.png', 'laser-bolt.png'];
   const ready = Promise.all(resources.map(name => new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => { images.set(name, img); resolve(); };
@@ -16,11 +16,28 @@ const ArenaRenderer = function(canvas) {
     img.src = `/assets/${name}`;
   })));
 
-  // Each player is drawn as the character matching their avatar. If both players
-  // picked the same character, the second player uses its alternate colours.
-  function sheetFor(player, index) {
-    const same = latest.players.length === 2 && latest.players[0].avatar === latest.players[1].avatar;
-    return `/assets/characters/char-${player.avatar}${same && index === 1 ? '-alt' : ''}.png`;
+  const sheetLoads = new Map(), resolvedSheets = new Map();
+  const fallback = Characters.sheet(Characters.defaultId);
+  function loadSheet(url) {
+    if (!sheetLoads.has(url)) {
+      const image = new Image();
+      image.src = url;
+      sheetLoads.set(url, image.decode().then(() => url));
+    }
+    return sheetLoads.get(url);
+  }
+  async function loadCharacters(players) {
+    await ready;
+    await loadSheet(fallback);
+    await Promise.all(players.map(async (_, i) => {
+      const url = Characters.matchSheet(players, i);
+      const resolved = await loadSheet(url).catch(() => fallback);
+      resolvedSheets.set(url, resolved);
+    }));
+  }
+  function sheetFor(index) {
+    const url = Characters.matchSheet(latest.players, index);
+    return resolvedSheets.get(url) || fallback;
   }
 
   const snapshot = data => {
@@ -121,7 +138,8 @@ const ArenaRenderer = function(canvas) {
       if (Math.random() < dt * 6) particles.push({ x: p.x + (Math.random() - .5) * 12, y: p.y - 8, vx: (Math.random() - .5) * 20, vy: -50 - Math.random() * 30, life: .5, max: .5, colour: '#ffb347', size: 2.5, gravity: 0 });
     }
     for (const power of latest.powers) {
-      const icon = images.get(`${power.kind}.svg`); if (!icon) continue;
+      const pixelPickup = power.kind === 'grapefruit' || power.kind === 'laser';
+      const icon = images.get(power.kind + (pixelPickup ? '.png' : '.svg')); if (!icon) continue;
       const bob = Math.sin(now / 180) * 3;
       ctx.fillStyle = power.kind === 'ice' ? '#b7f8ff66' : '#fff2a966';
       ctx.beginPath(); ctx.arc(power.x, power.y, 22 + Math.sin(now / 200) * 2, 0, Math.PI * 2); ctx.fill();
@@ -129,8 +147,18 @@ const ArenaRenderer = function(canvas) {
       const a = now / 300;
       ctx.fillStyle = '#ffffff'; ctx.fillRect(power.x + Math.cos(a) * 22 - 1.5, power.y + Math.sin(a) * 22 - 1.5, 3, 3);
       if (power.expiresAt - now < 2000) ctx.globalAlpha = .5 + .5 * Math.sin(now / 90);
-      ctx.drawImage(icon, power.x - 15, power.y - 17 + bob, 30, 30);
+      const size = pixelPickup ? 32 : 30;
+      ctx.drawImage(icon, Math.round(power.x - size / 2), Math.round(power.y - size / 2 + bob), size, size);
       ctx.globalAlpha = 1;
+    }
+
+    for (const bolt of latest.projectiles) {
+      const point = interpolated(bolt, 'projectiles', now);
+      ctx.save();
+      ctx.translate(Math.round(point.x), Math.round(point.y));
+      ctx.rotate(bolt.angle);
+      ctx.drawImage(images.get('laser-bolt.png'), -16, -8, 32, 16);
+      ctx.restore();
     }
 
     // Players: work out where each name tag goes first so they never overlap.
@@ -139,14 +167,15 @@ const ArenaRenderer = function(canvas) {
     const tags = views.map(({ player, p }) => {
       const label = (player.username === username ? 'YOU · ' : '') + player.name;
       const width = Math.min(205, ctx.measureText(label).width + 14);
-      return { label, width, x: Math.max(width / 2 + 4, Math.min(850 - width / 2, p.x)), y: p.y - 62 };
+      return { label, width, x: Math.max(width / 2 + 4, Math.min(850 - width / 2, p.x)), y: p.y - (p.growthUntil > now ? 96 : 62) };
     });
     if (tags.length === 2 && Math.abs(tags[0].x - tags[1].x) < (tags[0].width + tags[1].width) / 2 + 4 && Math.abs(tags[0].y - tags[1].y) < 24) {
       const lower = views[0].p.y > views[1].p.y ? 0 : 1;
       tags[lower].y = views[lower].p.y + 26; // move the lower player's tag under their feet
     }
     views.sort((a, b) => a.p.y - b.p.y).forEach(({ player, index, p }) => {
-      const key = `player:${player.username}`; active.add(key);
+      const sheet = sheetFor(index);
+      const key = `player:${player.username}:${sheet}`; active.add(key);
       const color = PLAYER_COLOURS[index];
       ctx.save();
       // Cheat aura: pulsing magenta/gold glow plus sparkles.
@@ -164,10 +193,10 @@ const ArenaRenderer = function(canvas) {
         particles.push({ x: p.x + (Math.random() - .5) * 10, y: p.y + 12, vx: (Math.random() - .5) * 30, vy: -10, life: .4, max: .4, colour: p.cheat ? '#ff9cf0' : '#ffe39a', size: 4, gravity: 0 });
       }
       if (!p.connected) ctx.globalAlpha = .5;
-      const s = sprite(key, () => Player(ctx, p.x, p.y, sheetFor(player, index))); s.sync(p); s.update(now); s.draw();
+      const s = sprite(key, () => Player(ctx, p.x, p.y, sheet)); s.sync(p, p.growthUntil > now ? 2 : 1); s.update(now); s.draw();
       ctx.globalAlpha = 1;
       if (p.freezeUntil > now) drawIce(p, now);
-      if (p.stunUntil > now) drawStars(p, now);
+      if (p.stunUntil > now || p.laserLockUntil > now) drawStars(p, now);
       const tag = tags[index];
       ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
       ctx.fillStyle = '#10232de8'; ctx.fillRect(tag.x - tag.width / 2, tag.y, tag.width, 20);
@@ -261,6 +290,13 @@ const ArenaRenderer = function(canvas) {
         burst(e.targetX, e.targetY, '#d8fbff', 26, 180, 5);
         bursts.push({ time: e.time, x: e.targetX, y: e.targetY, label: 'FROZEN!', colour: '#b7f8ff' });
       }
+    } else if (e.type === 'power' && (e.kind === 'grapefruit' || e.kind === 'laser')) {
+      const fruit = e.kind === 'grapefruit';
+      const colour = fruit ? '#ff9d79' : '#74f7eb';
+      burst(e.x, e.y, colour, 14);
+      bursts.push({ time: e.time, x: e.x, y: e.y, label: fruit ? 'DOUBLE REACH!' : '+1 LASER', colour });
+    } else if (e.type === 'laser-hit') {
+      burst(e.x, e.y, '#74f7eb', 20);
     } else if (e.type === 'wave') {
       banner('🔥 Another fire joins the glade!', '#ffb08a');
     } else if (e.type === 'frenzy') {
@@ -270,5 +306,5 @@ const ArenaRenderer = function(canvas) {
     }
   }
 
-  return { ready, snapshot, reset, draw, event };
+  return { ready, loadCharacters, snapshot, reset, draw, event };
 };
