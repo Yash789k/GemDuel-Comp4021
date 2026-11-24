@@ -1,0 +1,95 @@
+GEM RUSH DUEL - source adaptation and asset credits
+
+Supplied coursework sources were inspected read-only. The original labs have
+not been changed, and their account data and verification reports are not part
+of this application. Only the new project is required to run the game.
+
+SOURCE ADAPTATIONS
+
+Website/lab3_gem_rush/sprite.js -> public/scripts/sprite.js
+  Retains the closure/factory API, sheet image, frame sequence data, scaling,
+  position, shadow, drawImage source cropping, and elapsed-time frame update.
+  Removes Canvas-dependent BoundingBox access because collisions run on Node.
+
+Website/lab3_gem_rush/player.js -> public/scripts/player.js and server/game.js
+  Retains all eight idle/move sprite sequences, directional state changes and
+  Sprite composition. A sync method selects animations only when they change.
+  The lab's directional movement and bounds are adapted into server-owned,
+  time-based movement with simultaneous keys and diagonal normalization.
+
+Website/lab3_gem_rush/gem.js -> public/scripts/gem.js and server/game.js
+  Retains the four colored sequences and Sprite factory pattern. Random color,
+  position, birth/expiry and collection are moved to the server, replacing the
+  lab's one local collectible with a shared list of uniquely identified gems.
+
+Website/lab3_gem_rush/fire.js -> public/scripts/fire.js and server/game.js
+  Retains the supplied animated fire sequence. Adds network position updates;
+  server-side bouncing movement, damage and stun replace static corner fires.
+
+Website/lab3_gem_rush/gem_rush.html -> public/scripts/app.js, audio.js, render.js
+  Adapts Canvas setup, requestAnimationFrame rendering, Sprite update/draw,
+  Audio objects, restart-on-collection playback, keyboard release on blur,
+  page overlay concepts, the local font, and the original walkable rectangle.
+
+Website/lab3_gem_rush/bounding_box.js -> server/game.js
+  Reuses the idea of explicit game bounds and valid random placement. Replaces
+  Canvas Path2D and corner-only overlap checks with numeric circle geometry.
+
+Website/game_room.zip/game_server.js -> server/auth.js and storage.js
+  Adapts /register, /signin, /validate, Argon2 verification, express-session,
+  public user identity, server validation and local JSON account persistence.
+  Adds session regeneration/save, POST sign-out, confirmed passwords, atomic
+  writes, canonical uniqueness, and shared Socket.IO session authentication.
+
+Website/game_room.zip/public/scripts/game_room.js -> public/scripts/app.js
+  Adapts the jQuery page-section flow, form handlers, fetch JSON requests,
+  error feedback and user display. User text uses .text(), never HTML.
+  The avatar selection pattern is retained with four approved local SVGs.
+
+Website/hand_game/game_server.js -> game_server.js, server/matchmaking.js
+  Adapts the single Express/http/Socket.IO server, connection/presence, ready,
+  game start/end and disconnect handlers. Per-account Maps and private rooms
+  replace the lab's single global game; readiness now gates a shared countdown.
+
+Website/hand_game/public/scripts/hand_game.js -> public/scripts/app.js
+  Adapts socket-event-driven view updates, player status and result display.
+  Listeners are installed once, with reconnect recovery instead of reload loops.
+
+Website/game_server.zip/game_server.js
+  Inspected its Express JSON request/validation conventions. Card-specific code
+  and poker-hand-utils are unnecessary and were not included.
+
+Website/dinosaur_game.html and whackamole.html
+  Inspected for animation, keyboard/interaction and countdown examples. The
+  actual countdown uses shared server timestamps, avoiding independent timers.
+
+ASSETS AND LICENSES
+
+From the supplied lab3_gem_rush folder, bundled without visual/audio changes:
+  object_sprites.png, background.png,
+  collect.mp3, background.mp3, gameover.mp3, press-start-2p.ttf.
+  The supplied material did not identify a separate author/license for the
+  sprite, background and audio assets; no additional rights are asserted here.
+
+Press Start 2P: Copyright 2012 The Press Start 2P Project Authors.
+  SIL Open Font License 1.1: public/assets/FONT-LICENSE.txt (supplied original).
+
+jQuery 3.6.1: OpenJS Foundation and contributors, MIT license.
+  Local browser copy: public/vendor/jquery-3.6.1.min.js.
+  Supplied original license: public/assets/JQUERY-LICENSE.txt.
+
+Characters: the lab's player_sprite.png has been replaced by 8 original
+  pixel-art characters (fox, cat, frog, owl, bunny, bear, panda, penguin), each
+  with a main and an alternate colour sheet in public/assets/characters/. They
+  keep the lab sheet's 24x25 frame size and row order, so the lab Player and
+  Sprite modules still drive them. They and the matching avatar-*.svg icons were
+  generated for this project by asset-tools/make_characters.py (Python + Pillow);
+  the finished PNG/SVG files are bundled, so no generation step is needed.
+New local artwork: boots.svg and ice.svg were drawn specifically for this project.
+New sound effects: fire-hit.wav, power-up.wav, countdown.mp3, go.mp3,
+  freeze.mp3, cheat.mp3 and win.mp3 were synthesized during development
+  (Python + NumPy tone/noise generation, encoded with ffmpeg) and included as finished PCM audio files. No generation step is
+  needed to install, play or grade the project.
+
+All additional UI, multiplayer simulation, lifecycle logic and tests were
+written for this prototype using ordinary JavaScript, without a game engine.

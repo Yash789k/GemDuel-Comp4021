@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A two-player arcade race. Collect gems, dodge fire, and race to 50.">
+  <title>Gem Rush Duel</title>
+  <link rel="icon" href="/assets/ice.svg"><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Gem Rush Duel home"><span class="brand-gem">◆</span> GEM RUSH <span class="brand-duel">DUEL</span></a>
+    <nav><button class="quiet" id="rules-button">How to play</button><button class="quiet" id="mute-button" aria-pressed="false">Sound on</button><button id="signout-button" class="quiet" hidden>Sign out</button></nav>
+  </header>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <main>
+    <section id="home-view">
+      <div class="home-grid">
+        <div class="intro">
+          <p class="eyebrow">TWO PLAYERS. ONE SHARED ARENA.</p>
+          <h1>GEM RUSH<span>DUEL</span></h1>
+          <p class="lead">A little friendly competition.<br>A whole lot of shiny things.</p>
+          <p class="intro-copy">Race a friend to 50 points. Snatch the rare gems, dodge roaming fire, and turn the tide with a well-timed power-up.</p>
+          <div class="quick-facts"><span><b>2</b> real players</span><span><b>120</b> seconds</span><span><b>50</b> points to win</span></div>
+          <div class="glade-preview" aria-label="Pixel-art preview of the Gem Glade arena">
+            <span class="glade-label">THE GEM GLADE</span>
+            <span class="preview-gem green"></span><span class="preview-gem purple"></span><span class="preview-gem yellow"></span>
+            <span class="preview-player"></span><span class="preview-player p2"></span><span class="preview-fire"></span>
+            <span class="preview-caption">COLLECT. DODGE. OUTPLAY.</span>
+          </div>
+        </div>
+        <aside class="entry-panel panel">
+          <div id="auth-panel">
+            <p class="eyebrow">YOUR NEXT RIVAL AWAITS</p><h2>Enter the glade</h2><p class="muted">Your account. Your best score. Your rematch.</p>
+            <div class="tabs" role="tablist" aria-label="Account access"><button id="signin-tab" role="tab" aria-selected="true" aria-controls="signin-form">Sign in</button><button id="register-tab" role="tab" aria-selected="false" aria-controls="register-form">Create account</button></div>
+            <form id="signin-form">
+              <label for="signin-username">Username</label><input id="signin-username" name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required placeholder="Your player username">
+              <label for="signin-password">Password</label><input id="signin-password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="Your password">
+              <button class="primary wide" type="submit">Sign in & play</button>
+            </form>
+            <form id="register-form" hidden>
+              <div class="form-row"><div><label for="register-username">Username</label><input id="register-username" name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required placeholder="Letters, digits, _"></div><div><label for="register-name">Display name</label><input id="register-name" name="name" maxlength="24" required placeholder="What rivals see"></div></div>
+              <fieldset><legend>Choose your avatar</legend><div id="avatar-options" class="avatars"></div></fieldset>
+              <label for="register-password">Password <span class="muted">(8–128 characters)</span></label><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              <label for="register-confirm">Confirm password</label><input id="register-confirm" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              <button class="primary wide" type="submit">Create account</button>
+            </form>
+            <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+            <p class="session-tip">Playing together? Use two different browsers, or a normal and a private session.</p>
+          </div>
+          <div id="lobby-panel" hidden>
+            <div class="identity"><img id="my-avatar" alt=""><div><span class="eyebrow">WELCOME BACK</span><h2 id="my-name"></h2></div></div>
+            <div class="lobby-heading"><h3>In the glade</h3><span id="online-count" class="tag">0 online</span></div>
+            <ul id="online-players" class="player-list"></ul>
+            <p id="queue-status" class="message" role="status">Connecting to the game server…</p>
+            <button id="find-button" class="primary wide" disabled>Find a Match</button><button id="cancel-button" class="secondary wide" hidden>Cancel Search</button>
+            <p class="session-tip">First come, first matched. Both players load the arena before the shared countdown begins.</p>
+            <div class="lobby-heading"><h3>🏆 Hall of fame</h3><span class="tag">top 5</span></div><ol id="lobby-leaderboard" class="leaderboard compact"></ol>
+          </div>
+          <div class="panel-bottom"><span class="tiny-gem">◆</span> A quick duel. A worthy rival. One more round.</div>
+        </aside>
+      </div>
+      <section class="field-guide"><div class="section-title"><p class="eyebrow">A QUICK FIELD GUIDE</p><h2>Small gems. Big decisions.</h2></div><div id="home-rules"></div></section>
+    </section>
+    <section id="game-view" hidden>
+      <div class="game-heading"><span class="eyebrow">THE GEM GLADE <span id="match-phase"></span></span><button id="leave-button" class="quiet danger">Leave match (forfeit)</button></div>
+      <div class="scoreboard"><div id="player-zero" class="score-player mint"></div><div class="timer-block"><span class="eyebrow">FIRST TO 50</span><strong id="game-time">2:00</strong><span id="game-status">Loading arena…</span></div><div id="player-one" class="score-player peach"></div></div>
+      <div class="arena-wrap"><canvas id="arena" width="854" height="480" aria-label="Live two-player Gem Rush Duel arena"></canvas><div id="cheat-banner" hidden>CHEAT MODE ON</div><div id="arena-overlay" class="arena-overlay"><div id="vs-row" class="vs-row"></div><p id="overlay-detail">Loading arena…</p><strong id="countdown"></strong></div></div>
+      <div class="game-footer"><span><kbd>W A S D</kbd> / <kbd>↑ ← ↓ →</kbd> Move</span><span><kbd>C</kbd> Toggle cheat</span><span class="gem-legend"><i class="dot green"></i>1 <i class="dot red"></i>2 <i class="dot yellow"></i>3 <i class="dot purple"></i>5</span><span id="connection-status">Connected</span></div>
+      <p id="match-message" class="match-message" role="status" aria-live="polite"></p>
+    </section>
+    <section id="results-view" hidden>
+      <div class="result-heading"><p class="eyebrow">THE GLADE HAS SPOKEN</p><h1 id="result-title">Match complete</h1><p id="result-reason"></p></div>
+      <div class="results-grid"><div class="panel"><h2>Match ranking</h2><div id="match-ranking"></div><div class="table-scroll"><table class="stats-table"><thead id="stats-head"></thead><tbody id="stats-body"></tbody></table></div><p id="save-message" role="status"></p><div class="result-actions"><button id="rematch-button" class="primary">Play again</button><button id="home-button" class="secondary">Back to Home</button></div><p id="rematch-status" role="status"></p><div id="rematch-readiness"></div></div><aside class="panel"><p class="eyebrow">ALL-TIME TOP 10</p><h2>The high rollers</h2><p class="muted">Ranked by best score, then wins</p><p id="my-rank" class="my-rank"></p><ol id="leaderboard" class="leaderboard"></ol><p class="session-tip">Completed matches count, including cheat use and forfeits. Draws add no wins.</p></aside></div>
+    </section>
+  </main>
+  <footer class="page-footer"><span>GEM RUSH DUEL <span class="muted">/ Made for a little rivalry.</span></span><a href="/README.html" target="_blank" rel="noopener">Project guide</a></footer>
+  <dialog id="rules-dialog"><div class="dialog-heading"><h2>How to play</h2><button id="close-rules" class="quiet">Close</button></div><div id="dialog-rules"></div></dialog>
+  <template id="rules-template">
+    <div class="rules-grid">
+      <article><h3><span>◆</span> Chase the shine</h3><p>Collect green <b>1</b>, red <b>2</b>, yellow <b>3</b>, and purple <b>5</b> point gems. They vanish after 6 seconds. Only one player gets each gem.</p></article>
+      <article><h3><img src="/assets/boots.svg" alt=""> Take the advantage</h3><p><b>Speed Boots:</b> 1.5× speed for 5 seconds. <b>Ice Crystal:</b> freezes your rival for 2 seconds. Pickups activate automatically; repeats refresh the duration.</p></article>
+      <article><h3><span class="fire-icon">♨</span> Mind the fire</h3><p>Moving fire costs <b>2 points</b> and stuns you for <b>1 second</b>, with a 1.5-second hit cooldown. Scores never go below zero. Frozen or stunned players cannot move or collect. <b>The heat rises:</b> an extra fire joins when 1:00 and 0:30 remain.</p></article>
+      <article><h3><kbd>WASD</kbd> Make your move</h3><p>Use <b>WASD or arrow keys</b>. Players can block each other. First to <b>50 points</b> wins. After <b>2 minutes</b>, the higher score wins; equal scores draw. <b>Gem Frenzy:</b> in the final 20 seconds gems appear twice as fast. Chain gems without getting hit for a streak bonus on the results page!</p></article>
+    </div>
+    <details class="cheat-guide"><summary><kbd>C</kbd> The not-so-secret cheat code</summary><p>Press C once to enable, again to disable. <b>CHEAT MODE ON</b> gives 2× speed, 3× gem points, and immunity to fire and ice. It clears current stun and freeze. Cheat speed overrides boots while their 5-second timer keeps running. Turning cheat off restores any unexpired boots; cleared effects stay cleared. Cheat use is shown in results and completed matches count on the leaderboard.</p></details>
+    <p class="rules-note">A dropped connection has 10 seconds to return; the match clock keeps running. Leaving or signing out during play forfeits immediately. Both players must request a rematch.</p>
+  </template>
+  <script src="/vendor/jquery-3.6.1.min.js"></script><script src="/socket.io/socket.io.js"></script><script src="/scripts/sprite.js"></script><script src="/scripts/player.js"></script><script src="/scripts/gem.js"></script><script src="/scripts/fire.js"></script><script src="/scripts/render.js"></script><script src="/scripts/audio.js"></script><script src="/scripts/app.js"></script>
+</body>
+</html>
