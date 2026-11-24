@@ -20,6 +20,7 @@ class Game {
     this.gems = [];
     this.fires = [];
     this.powers = [];
+    this.dropsUntilLaser = config.firstLaserByDrop;
     this.projectiles = [];
     this.ready = new Set();
     this.rematch = new Set();
@@ -97,7 +98,10 @@ class Game {
     if (this.powers.length >= this.config.maxPowers) return;
     const point = this.spot(14);
     if (!point) return;
-    const kind = powerKinds[Math.floor(this.random() * powerKinds.length)];
+    // Count successful placements so a full arena cannot consume a guaranteed laser.
+    const kind = this.dropsUntilLaser === 1 ? 'laser' : powerKinds[Math.floor(this.random() * powerKinds.length)];
+    if (kind === 'laser') this.dropsUntilLaser = this.config.maxDropsBetweenLasers + 1;
+    else this.dropsUntilLaser--;
     this.powers.push({ id: `p${++this.nextId}`, ...point, radius: 14, kind, expiresAt: now + this.config.powerLifetime });
   }
   addFire() {

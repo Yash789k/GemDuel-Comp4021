@@ -22,14 +22,30 @@ function pickup(game, kind, now) {
 }
 
 test('the four power-ups can each spawn using the existing spawn system', () => {
-  const game = duel();
   for (const [index, kind] of ['boots', 'ice', 'grapefruit', 'laser'].entries()) {
-    game.powers.length = 0;
+    const game = duel();
     game.random = () => (index + .5) / 4;
     game.spawnPower(4200);
     assert.equal(game.powers[0].kind, kind);
     assert.equal(game.powers[0].expiresAt, 14200);
   }
+});
+
+test('natural drops start at six seconds and bound the wait for both early and later lasers', () => {
+  const game = duel();
+  game.random = () => 0; // Always chooses boots unless a laser is due.
+  game.step(game.startAt + 5999, 0);
+  assert.equal(game.powers.length, 0);
+  const sequence = [];
+  for (let drop = 1; drop <= 10; drop++) {
+    const now = game.startAt + drop * 6000;
+    game.step(now, 0);
+    const newest = game.powers.at(-1);
+    assert.equal(newest.expiresAt, now + 10000);
+    assert.ok(game.powers.length <= 2);
+    sequence.push(newest.kind);
+  }
+  assert.deepEqual(sequence, ['boots', 'laser', 'boots', 'boots', 'boots', 'laser', 'boots', 'boots', 'boots', 'laser']);
 });
 
 test('grapefruit doubles gem reach around the player, refreshes and expires at exactly five seconds', () => {
