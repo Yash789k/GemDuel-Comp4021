@@ -1,113 +1,108 @@
-// Adapted from lab3_gem_rush/sprite.js; rendering only, collisions now live on the server.
-const Sprite = function(ctx, x, y) {
+const Sprite = function (ctx, x, y) {
+  const sheet = new Image();
 
-    const sheet = new Image();
+  let sequence = { x: 0, y: 0, width: 20, height: 20, count: 1, timing: 0, loop: false };
+  let index = 0;
+  let scale = 1;
+  let shadowScale = { x: 1, y: 0.25 };
+  let lastUpdate = null;
 
-    // Source rectangle, number of horizontal frames, and milliseconds per frame.
-    let sequence = { x: 0, y: 0, width: 20, height: 20, count: 1, timing: 0, loop: false };
+  const useSheet = function (spriteSheet) {
+    sheet.src = spriteSheet;
+    return this;
+  };
 
-    let index = 0;
+  const isReady = function () {
+    return sheet.complete && sheet.naturalHeight !== 0;
+  };
 
-    let scale = 1;
+  const setXY = function (xvalue, yvalue) {
+    [x, y] = [xvalue, yvalue];
+    return this;
+  };
 
-    let shadowScale = { x: 1, y: 0.25 };
+  const setSequence = function (newSequence) {
+    sequence = newSequence;
+    index = 0;
+    lastUpdate = null;
+    return this;
+  };
 
-    let lastUpdate = null;
+  const setScale = function (value) {
+    scale = value;
+    return this;
+  };
 
-    const useSheet = function(spriteSheet) {
-        sheet.src = spriteSheet;
-        return this;
+  const setShadowScale = function (value) {
+    shadowScale = value;
+    return this;
+  };
+
+  const getDisplaySize = function () {
+    return {
+      width: sequence.width * scale,
+      height: sequence.height * scale,
     };
+  };
 
-    const isReady = function() {
-        return sheet.complete && sheet.naturalHeight != 0;
-    };
+  const drawShadow = function () {
+    const size = getDisplaySize();
+    const shadowWidth = size.width * shadowScale.x;
+    const shadowHeight = size.height * shadowScale.y;
 
-    const setXY = function(xvalue, yvalue) {
-        [x, y] = [xvalue, yvalue];
-        return this;
-    };
+    ctx.save();
+    ctx.fillStyle = 'black';
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(x, y + size.height / 2, shadowWidth / 2, shadowHeight / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
 
-    const setSequence = function(newSequence) {
-        sequence = newSequence;
-        index = 0;
-        lastUpdate = null;
-        return this;
-    };
+  const drawSprite = function () {
+    const size = getDisplaySize();
 
-    const setScale = function(value) {
-        scale = value;
-        return this;
-    };
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      sheet,
+      sequence.x + index * sequence.width,
+      sequence.y,
+      sequence.width,
+      sequence.height,
+      Math.round(x - size.width / 2),
+      Math.round(y - size.height / 2),
+      size.width,
+      size.height,
+    );
+    ctx.restore();
+  };
 
-    const setShadowScale = function(value) {
-        shadowScale = value;
-        return this;
-    };
+  const draw = function () {
+    if (isReady()) {
+      drawShadow();
+      drawSprite();
+    }
+    return this;
+  };
 
-    const getDisplaySize = function() {
-        const scaledWidth  = sequence.width * scale;
-        const scaledHeight = sequence.height * scale;
-        return {width: scaledWidth, height: scaledHeight};
-    };
+  const update = function (time) {
+    if (lastUpdate === null) lastUpdate = time;
 
-    const drawShadow = function() {
-        ctx.save();
-
-        const size = getDisplaySize();
-
-        const shadowWidth  = size.width * shadowScale.x;
-        const shadowHeight = size.height * shadowScale.y;
-
-        ctx.fillStyle = "black";
-        ctx.globalAlpha = 0.6;
-        ctx.beginPath();
-        ctx.ellipse(x, y + size.height / 2,
-                    shadowWidth / 2, shadowHeight / 2, 0, 0, 2 * Math.PI);
-        ctx.fill();
-
-        ctx.restore();
-    };
-
-    const drawSprite = function() {
-        ctx.save();
-
-        const size = getDisplaySize();
-
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(sheet,
-                      sequence.x + index * sequence.width, sequence.y,
-                      sequence.width, sequence.height,
-                      Math.round(x - size.width / 2), Math.round(y - size.height / 2),
-                      size.width, size.height);
-
-        ctx.restore();
-    };
-
-    const draw = function() {
-        if (isReady()) {
-            drawShadow();
-            drawSprite();
+    if (sequence.timing > 0) {
+      const frames = Math.floor((time - lastUpdate) / sequence.timing);
+      if (frames > 0) {
+        if (sequence.loop) {
+          index = (index + frames) % sequence.count;
+        } else {
+          index = Math.min(index + frames, sequence.count - 1);
         }
-        return this;
-    };
+        lastUpdate += frames * sequence.timing;
+      }
+    }
 
-    const update = function(time) {
-        if (lastUpdate === null) lastUpdate = time;
+    return this;
+  };
 
-        if (sequence.timing > 0) {
-            const frames = Math.floor((time - lastUpdate) / sequence.timing);
-            if (frames > 0) {
-                if (sequence.loop)
-                    index = (index + frames) % sequence.count;
-                else
-                    index = Math.min(index + frames, sequence.count - 1);
-                lastUpdate += frames * sequence.timing;
-            }
-        }
-
-        return this;
-    };
-
-    return { useSheet, setXY, setSequence, setScale, setShadowScale, draw, update };
+  return { useSheet, setXY, setSequence, setScale, setShadowScale, draw, update };
 };
